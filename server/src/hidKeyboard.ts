@@ -1,6 +1,7 @@
 import { DataType } from './dataTypes';
 import { IProvider } from './providers/providerBase';
 import * as hid from 'node-hid';
+import config from './config.json';
 
 class HidKeyboard {
   private keyboard: hid.HID | undefined;
@@ -26,7 +27,12 @@ class HidKeyboard {
     }
 
     const devices = hid.devices();
-    const device = devices.find(x => x.usage === 0x61 && x.usagePage === 0xff60 && x.productId === 0x0843);
+    const device = devices.find(
+      x =>
+        x.usage === parseInt(config.device.usage) &&
+        x.usagePage === parseInt(config.device.usagePage) &&
+        x.productId === parseInt(config.device.productId)
+    );
     if (device?.path) {
       console.log(`Found device with path ${device.path}`);
       try {
@@ -84,6 +90,7 @@ class HidKeyboard {
   }
 
   private onKeyboardData(data: number[] | Buffer) {
+    console.log('Received data from keyboard', data);
     const [dataType] = data;
     console.log(`Keyboard requested ${DataType[dataType] ?? dataType}`);
     const provider = this.providers.find(x => x.type === dataType);

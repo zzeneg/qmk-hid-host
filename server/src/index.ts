@@ -1,5 +1,4 @@
 import { Server } from 'socket.io';
-
 import { IProvider } from './providers/providerBase';
 import TimeProvider from './providers/timeProvider';
 import VolumeProvider from './providers/volumeProvider';
@@ -7,6 +6,7 @@ import LayoutProvider from './providers/layoutProvider';
 import MediaArtistProvider from './providers/mediaArtistProvider';
 import MediaTitleProvider from './providers/mediaTitleProvider';
 import HidKeyboard from './hidKeyboard';
+import config from './config.json';
 
 const providers: IProvider[] = [
   new TimeProvider(),
@@ -35,7 +35,7 @@ io.on('connection', socket => {
   }
 });
 
-io.listen(11000);
+io.listen(config.socket.port);
 
 console.log('SocketIO server started');
 
