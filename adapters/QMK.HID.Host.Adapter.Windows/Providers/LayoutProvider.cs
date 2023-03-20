@@ -11,6 +11,8 @@ public class LayoutProvider : ProviderBase
 
     public override async Task Enable()
     {
+        await base.Enable();
+
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         var _ = Task.Run(async () =>
         {
@@ -19,8 +21,6 @@ public class LayoutProvider : ProviderBase
                 OnValueChanged(GetValue());
             }
         });
-
-        await base.Enable();
     }
 
     public override Task Disable()
