@@ -1,0 +1,10 @@
+{
+  "socket": {
+    "port": 11000
+  },
+  "device": {
+    "usage": "0x61",
+    "usagePage": "0xff60",
+    "productId": "0x0844"
+  }
+}

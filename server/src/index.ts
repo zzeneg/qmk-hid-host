@@ -6,7 +6,7 @@ import LayoutProvider from './providers/layoutProvider';
 import MediaArtistProvider from './providers/mediaArtistProvider';
 import MediaTitleProvider from './providers/mediaTitleProvider';
 import HidKeyboard from './hidKeyboard';
-import config from './config.json';
+import config from './config';
 
 const providers: IProvider[] = [
   new TimeProvider(),

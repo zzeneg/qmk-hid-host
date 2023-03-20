@@ -7,9 +7,9 @@
     "start": "npm run build:live",
     "build": "tsc",
     "build:live": "ts-node-dev --respawn --transpile-only --exit-child --watch src src/index.ts",
-    "pkg": "pkg dist/index.js --targets latest-win-x64  --output ../dist/QMK.HID.Host.Server",
-    "copy:hid": "node -e \"require('fs').copyFileSync('node_modules/node-hid/build/Release/HID.node', '../dist/HID.node')\"",
-    "publish": "npm run build && npm run pkg && npm run copy:hid",
+    "pkg": "pkg dist/index.js --output ../dist/QMK.HID.Host.Server --config package.json",
+    "copy:config": "node -e \"require('fs').copyFileSync('src/config.json', '../dist/QMK.HID.Host.Server.json')\"",
+    "publish": "npm run build && npm run pkg && npm run copy:config",
     "check": "eslint . && prettier . --check",
     "fix": "eslint . --fix && prettier . --write",
     "hook:pre-commit": "npx lint-staged --quiet"
@@ -48,5 +48,13 @@
       "prettier"
     ],
     "!**/*.{ts,js}": "prettier --write --ignore-unknown"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/node-hid/build/Release/HID.node"
+    ],
+    "targets": [
+      "latest-win-x64"
+    ]
   }
 }

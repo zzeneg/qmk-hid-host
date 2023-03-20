@@ -1,7 +1,7 @@
 import { DataType } from './dataTypes';
 import { IProvider } from './providers/providerBase';
 import * as hid from 'node-hid';
-import config from './config.json';
+import config from './config';
 
 class HidKeyboard {
   private keyboard: hid.HID | undefined;
