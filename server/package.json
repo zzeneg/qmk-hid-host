@@ -40,7 +40,8 @@
   },
   "dependencies": {
     "node-hid": "^2.1.2",
-    "socket.io": "^4.5.4"
+    "socket.io": "^4.5.4",
+    "systeminformation": "^5.17.12"
   },
   "lint-staged": {
     "**/*.{ts,js}": [

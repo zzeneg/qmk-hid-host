@@ -7,6 +7,7 @@ import MediaArtistProvider from './providers/mediaArtistProvider';
 import MediaTitleProvider from './providers/mediaTitleProvider';
 import HidKeyboard from './hidKeyboard';
 import config from './config';
+// import SystemInfoProvider from './providers/systemInfoProvider';
 
 const providers: IProvider[] = [
   new TimeProvider(),
@@ -14,6 +15,7 @@ const providers: IProvider[] = [
   new LayoutProvider(),
   new MediaArtistProvider(),
   new MediaTitleProvider(),
+  // new SystemInfoProvider(), // disabled by default
 ];
 
 const hidKeyboard = new HidKeyboard(providers);

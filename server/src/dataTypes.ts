@@ -4,4 +4,5 @@ export enum DataType {
   Layout,
   MediaArtist,
   MediaTitle,
+  SystemInfo,
 }
