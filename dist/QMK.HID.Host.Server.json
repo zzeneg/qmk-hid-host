@@ -6,5 +6,6 @@
     "usage": "0x61",
     "usagePage": "0xff60",
     "productId": "0x0844"
-  }
+  },
+  "layouts": ["en", "ru"]
 }
