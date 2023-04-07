@@ -21,7 +21,7 @@ class HidKeyboard {
     this.tryConnect();
   }
 
-  private tryConnect(retryDelay = 1, prevRetryDelay = 0) {
+  private tryConnect() {
     if (this.isConnected()) {
       return;
     }
@@ -42,9 +42,9 @@ class HidKeyboard {
         this.onDisconnect();
       }
     } else {
-      const delay = retryDelay + prevRetryDelay;
-      console.error(`Keyboard not found, trying to connect in ${delay} seconds...`);
-      setTimeout(() => this.tryConnect(delay, retryDelay), delay * 1000);
+      const delay = config.reconnectDelay || 5000;
+      console.error(`Keyboard not found, trying to connect in ${delay} ms...`);
+      setTimeout(() => this.tryConnect(), delay);
     }
   }
 
