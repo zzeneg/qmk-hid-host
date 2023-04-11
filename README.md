@@ -6,6 +6,13 @@ Host component for communicating with QMK keyboards using Raw HID feature. Requi
 
 Host contains two parts - server and adapters, which communicate between each other using [socket.io](https://socket.io). Server is a cross-platform application written in node.js, and adapters should be OS-specific to be able to use OS functions. Currently only Windows adapter written in C# exists.
 
+## Supported providers
+
+- Time
+- Volume
+- Input layout
+- Media artist and song title
+
 ## How to run it
 
 1. Download and open [dist](/dist) folder.
