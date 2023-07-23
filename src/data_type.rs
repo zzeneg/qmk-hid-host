@@ -4,5 +4,4 @@ pub enum DataType {
     Layout,
     MediaArtist,
     MediaTitle,
-    SystemInfo,
 }
