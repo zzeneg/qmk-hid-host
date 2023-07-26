@@ -2,37 +2,49 @@ mod data_type;
 mod keyboard;
 mod providers;
 
-use async_std::channel::{self, Sender};
+use tokio::sync::broadcast;
+use tracing::{info, warn};
 
 use crate::{
-    data_type::DataType,
     keyboard::Keyboard,
-    providers::{_base::Provider, time::TimeProvider},
+    providers::{_base::Provider, time::TimeProvider, volume::VolumeProvider},
 };
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let subscriber = tracing_subscriber::fmt().finish();
+    let _ = tracing::subscriber::set_global_default(subscriber);
+
+    info!("Started");
+
+    let (connected_sender, mut connected_receiver) = broadcast::channel::<bool>(1);
+    let (pull_sender, _) = broadcast::channel::<u8>(1);
+    let (push_sender, _) = broadcast::channel::<Vec<u8>>(1);
+
+    let providers: Vec<Box<dyn Provider>> = vec![
+        TimeProvider::new(push_sender.clone()),
+        VolumeProvider::new(push_sender.clone(), pull_sender.clone()),
+    ];
+
     let keyboard = Keyboard::new(0x0844, 0x61, 0xff60);
-    let (connected_sender, connected_receiver) = channel::unbounded::<bool>();
     keyboard.connect(connected_sender.clone());
+
     let mut current_status = false;
 
     loop {
-        if let Ok(connected) = connected_receiver.recv_blocking() {
+        if let Ok(connected) = connected_receiver.recv().await {
             if connected != current_status {
                 current_status = connected;
-                let (pull_sender, pull_receiver) = channel::unbounded::<u8>();
-                let (push_sender, push_receiver) = channel::unbounded::<Vec<u8>>();
                 if current_status {
-                    keyboard.start_reader(connected_sender.clone(), pull_sender);
-                    keyboard.start_writer(connected_sender.clone(), push_receiver);
-                    let providers: Vec<Box<dyn Provider>> = vec![TimeProvider::new(push_sender, pull_receiver)];
+                    // keyboard.start_reader(connected_sender.clone(), pull_sender.clone());
+                    keyboard.start_writer(connected_sender.clone(), push_sender.clone());
+                    while push_sender.receiver_count() == 0 {
+                        let _ = tokio::time::sleep(std::time::Duration::from_millis(50));
+                    }
                     providers.iter().for_each(|p| p.enable());
                 } else {
-                    println!("Keyboard disconnected");
-                    pull_sender.close();
-                    pull_receiver.close();
-                    push_sender.close();
-                    push_receiver.close();
+                    warn!("Keyboard disconnected");
+                    providers.iter().for_each(|p| p.disable());
                     keyboard.connect(connected_sender.clone());
                 }
             }

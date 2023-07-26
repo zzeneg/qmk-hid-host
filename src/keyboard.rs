@@ -1,7 +1,6 @@
-use async_std::channel::{self, Receiver, Sender};
 use hidapi::{HidApi, HidDevice, HidError};
-
-use crate::data_type::DataType;
+use tokio::{select, sync::broadcast::Sender};
+use tracing::{error, info, warn};
 
 pub struct Keyboard {
     pid: u16,
@@ -31,17 +30,16 @@ impl Keyboard {
         let pid = self.pid.clone();
         let usage = self.usage.clone();
         let usage_page = self.usage_page.clone();
-        let mut is_connected: bool = false;
-        println!("Trying to connect...");
+        info!("Trying to connect...");
 
-        while !is_connected {
+        loop {
             let device_result = Self::get_device(pid, usage, usage_page);
             if let Ok(_) = device_result {
-                println!("Connected");
-                is_connected = true;
-                let _ = connected_sender.send_blocking(true);
+                info!("Connected");
+                let _ = connected_sender.send(true);
+                break;
             } else {
-                std::thread::sleep(std::time::Duration::from_secs(5));
+                let _ = tokio::time::sleep(std::time::Duration::from_secs(5));
             }
         }
     }
@@ -50,59 +48,68 @@ impl Keyboard {
         let pid = self.pid.clone();
         let usage = self.usage.clone();
         let usage_page = self.usage_page.clone();
-        std::thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             let device_result = Self::get_device(pid, usage, usage_page);
             if let Ok(device) = device_result {
-                println!("Reader connected to keyboard");
-                let mut is_connected: bool = true;
-                while is_connected {
-                    let mut buf = [0u8; 32];
+                info!("Reader connected to keyboard");
+                let mut buf = [0u8; 32];
+                loop {
                     if let Ok(_) = device.read(buf.as_mut()) {
-                        println!("Received from keyboard: {:?}", buf);
-                        if let Err(_) = pull_sender.send_blocking(buf[0]) {
-                            println!("PULL_SENDER CLOSED");
-                            is_connected = false;
+                        info!("Received from keyboard: {:?}", buf);
+                        if let Err(_) = pull_sender.send(buf[0]) {
+                            warn!("PULL_SENDER CLOSED");
                         }
                     } else {
-                        println!("DEVICE READING ERROR");
-                        is_connected = false;
+                        error!("DEVICE READING ERROR");
+                        break;
                     }
                 }
 
-                let _ = connected_sender.send_blocking(false);
-                pull_sender.close();
-                println!("Reader disconnected from keyboard");
+                let _ = connected_sender.send(false);
+                warn!("Reader disconnected from keyboard");
             }
         });
     }
 
-    pub fn start_writer(&self, connected_sender: Sender<bool>, push_receiver: Receiver<Vec<u8>>) {
+    pub fn start_writer(&self, connected_sender: Sender<bool>, push_sender: Sender<Vec<u8>>) {
         let pid = self.pid.clone();
         let usage = self.usage.clone();
         let usage_page = self.usage_page.clone();
-        std::thread::spawn(move || {
+        let mut connected_receiver = connected_sender.subscribe();
+        tokio::spawn(async move {
             let device_result = Self::get_device(pid, usage, usage_page);
             if let Ok(device) = device_result {
-                println!("Writer connected to keyboard");
-                let mut is_connected: bool = true;
-                while is_connected {
-                    if let Ok(mut received) = push_receiver.recv_blocking() {
-                        println!("Sending to keyboard: {:?}", received);
-                        received.truncate(32);
-                        received.insert(0, 0);
-                        if let Err(_) = device.write(received.as_mut()) {
-                            println!("DEVICE WRITING ERROR");
-                            is_connected = false;
+                info!("Writer connected to keyboard");
+                let mut push_receiver = push_sender.subscribe();
+                loop {
+                    select! {
+                        msg = connected_receiver.recv() => {
+                            if let Ok(connected) = msg {
+                                if !connected {
+                                    break;
+                                }
+                            } else {
+                                error!("start_writer connected_receiver: {}", msg.unwrap_err());
+                            }
                         }
-                    } else {
-                        println!("PUSH_RECEIVER CLOSED");
-                        is_connected = false;
+                        msg = push_receiver.recv() => {
+                            if let Ok(mut received) = msg {
+                                info!("Sending to keyboard: {:?}", received);
+                                received.truncate(32);
+                                received.insert(0, 0);
+                                if let Err(_) = device.write(received.as_mut()) {
+                                    error!("DEVICE WRITING ERROR");
+                                    let _ = connected_sender.send(false);
+                                    break;
+                                }
+                            } else {
+                                error!("start_writer push_receiver: {}", msg.unwrap_err());
+                            }
+                        }
                     }
                 }
 
-                let _ = connected_sender.send_blocking(false);
-                push_receiver.close();
-                println!("Writer disconnected from keyboard");
+                info!("Writer disconnected from keyboard");
             }
         });
     }
