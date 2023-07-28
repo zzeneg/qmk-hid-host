@@ -1,28 +1,20 @@
-use std::time::Duration;
-
 use chrono::{DateTime, Local, Timelike};
-use tokio::{
-    select,
-    sync::{broadcast::Sender, watch},
-    time::interval,
-};
-use tracing::{error, info};
+use tokio::sync::{broadcast, mpsc};
 
 use crate::data_type::DataType;
 
 use super::_base::Provider;
 
 pub struct TimeProvider {
-    push_sender: Sender<Vec<u8>>,
-    enabled_sender: watch::Sender<bool>,
+    data_sender: mpsc::Sender<Vec<u8>>,
+    connected_sender: broadcast::Sender<bool>,
 }
 
 impl TimeProvider {
-    pub fn new(push_sender: Sender<Vec<u8>>) -> Box<dyn Provider> {
-        let (enabled_sender, _) = watch::channel::<bool>(true);
+    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
         let provider = TimeProvider {
-            push_sender,
-            enabled_sender,
+            data_sender,
+            connected_sender,
         };
         return Box::new(provider);
     }
@@ -33,38 +25,36 @@ impl TimeProvider {
         let minute = now.minute() as u8;
         return (hour, minute);
     }
+
+    fn send(value: (u8, u8), push_sender: &mpsc::Sender<Vec<u8>>) {
+        let data = vec![DataType::Time as u8, value.0, value.1];
+        push_sender.try_send(data).unwrap();
+    }
 }
 
 impl Provider for TimeProvider {
-    fn enable(&self) {
-        info!("Time Provider enabled");
-        let push_sender = self.push_sender.clone();
-        let mut interval = interval(Duration::from_secs(1));
-        let mut enabled_receiver = self.enabled_sender.subscribe();
-        self.enabled_sender.send(true).unwrap_or_else(|e| error!("enable {}", e));
-        tokio::spawn(async move {
-            let (mut saved_hour, mut saved_minute) = (0u8, 0u8);
+    fn start(&self) {
+        tracing::info!("Time Provider enabled");
+        let data_sender = self.data_sender.clone();
+        let connected_sender = self.connected_sender.clone();
+        std::thread::spawn(move || {
+            let mut connected_receiver = connected_sender.subscribe();
+            let mut synced_time = (0u8, 0u8);
             loop {
-                select! {
-                    _ = enabled_receiver.wait_for(|e| *e == false) => {
-                        break;
-                    }
-                    _ = interval.tick() => {
-                        let (hour, minute) = TimeProvider::get();
-                        if saved_hour != hour || saved_minute != minute {
-                            (saved_hour, saved_minute) = (hour, minute);
-                            let data = vec![DataType::Time as u8, saved_hour, saved_minute];
-                            let _ = push_sender.send(data);
-                        }
-                    }
+                if !connected_receiver.try_recv().unwrap_or(true) {
+                    break;
                 }
+
+                let time = TimeProvider::get();
+                if synced_time != time {
+                    TimeProvider::send(time, &data_sender);
+                    synced_time = time;
+                }
+
+                std::thread::sleep(std::time::Duration::from_secs(1));
             }
 
-            info!("Time Provider stopped");
+            tracing::info!("Time Provider stopped");
         });
-    }
-
-    fn disable(&self) {
-        self.enabled_sender.send(false).unwrap_or_else(|e| error!("disable: {}", e));
     }
 }

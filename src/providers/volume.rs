@@ -1,55 +1,35 @@
-use tokio::{
-    select,
-    sync::{broadcast::Sender, watch},
-};
-use tracing::{error, info};
-use windows::{
-    core::HSTRING,
-    Win32::{
-        Media::Audio::{
-            eConsole, eMultimedia, eRender,
-            Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl},
-            IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
-        },
-        System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED},
+use tokio::sync::{broadcast, mpsc};
+use windows::Win32::{
+    Media::Audio::{
+        eMultimedia, eRender,
+        Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl},
+        IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
     },
+    System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED},
 };
 
 use crate::data_type::DataType;
 
 use super::_base::Provider;
 
-#[windows::core::implement(IAudioEndpointVolumeCallback)]
-struct VolumeChangeCallback {
-    push_sender: Sender<Vec<u8>>,
-}
-
-impl IAudioEndpointVolumeCallback_Impl for VolumeChangeCallback {
-    fn OnNotify(&self, pnotify: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> ::windows::core::Result<()> {
-        unsafe {
-            let volume = ((*pnotify).fMasterVolume * 100.0) as u8;
-            let data = vec![DataType::Volume as u8, volume];
-            let _ = self.push_sender.send(data);
-        }
-        return Ok(());
-    }
-}
-
 pub struct VolumeProvider {
-    push_sender: Sender<Vec<u8>>,
-    pull_sender: Sender<u8>,
-    enabled_sender: watch::Sender<bool>,
+    data_sender: mpsc::Sender<Vec<u8>>,
+    connected_sender: broadcast::Sender<bool>,
 }
 
 impl VolumeProvider {
-    pub fn new(push_sender: Sender<Vec<u8>>, pull_sender: Sender<u8>) -> Box<dyn Provider> {
-        let (enabled_sender, _) = watch::channel::<bool>(true);
+    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
         let provider = VolumeProvider {
-            push_sender,
-            pull_sender,
-            enabled_sender,
+            data_sender,
+            connected_sender,
         };
         return Box::new(provider);
+    }
+
+    fn send(value: f32, push_sender: &mpsc::Sender<Vec<u8>>) {
+        let volume = (value * 100.0) as u8;
+        let data = vec![DataType::Volume as u8, volume];
+        push_sender.try_send(data).unwrap();
     }
 
     unsafe fn load_endpoint() -> IAudioEndpointVolume {
@@ -60,69 +40,47 @@ impl VolumeProvider {
         return endpoint_volume;
     }
 
-    unsafe fn get(endpoint_volume: IAudioEndpointVolume) -> u8 {
-        let volume = endpoint_volume.GetMasterVolumeLevelScalar().unwrap_or_default();
-
-        return (volume * 100.0) as u8;
-    }
-
-    fn push(push_sender: &Sender<Vec<u8>>) {
-        let endpoint = unsafe { VolumeProvider::load_endpoint() };
-        let volume = unsafe { VolumeProvider::get(endpoint) };
-        let data = vec![DataType::Volume as u8, volume];
-        let _ = push_sender.send(data);
+    fn get() -> f32 {
+        let endpoint_volume = unsafe { VolumeProvider::load_endpoint() };
+        return unsafe { endpoint_volume.GetMasterVolumeLevelScalar().unwrap() };
     }
 }
 
 impl Provider for VolumeProvider {
-    fn enable(&self) {
-        info!("Volume Provider enabled");
-        let _ = VolumeProvider::push(&self.push_sender);
-        // let push_sender = self.push_sender.clone();
-        let mut enabled_receiver = self.enabled_sender.subscribe();
-        // let mut pull_receiver = self.pull_sender.subscribe();
-        self.enabled_sender.send(true).unwrap_or_else(|e| error!("enable {}", e));
-        // tokio::spawn(async move {
-        //     loop {
-        //         select! {
-        //             _ = enabled_receiver.wait_for(|e| *e == false) => {
-        //                 break;
-        //             }
-        //             msg = pull_receiver.recv() => {
-        //                 if let Ok(received) = msg {
-        //                     if received == (DataType::Volume as u8) {
-        //                         info!("Volume Provider pulled");
-        //                         VolumeProvider::push(&push_sender);
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-
-        //     info!("Volume Provider stopped");
-        // });
-
-        let push_sender = self.push_sender.clone();
-        tokio::task::spawn_blocking(move || {
+    fn start(&self) {
+        tracing::info!("Volume Provider started");
+        let volume = VolumeProvider::get();
+        VolumeProvider::send(volume, &self.data_sender);
+        let data_sender = self.data_sender.clone();
+        let connected_sender = self.connected_sender.clone();
+        std::thread::spawn(move || {
+            let mut connected_receiver = connected_sender.subscribe();
             let endpoint_volume = unsafe { VolumeProvider::load_endpoint() };
-            let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender }.into();
-            unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback) };
+            let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender: data_sender }.into();
+            unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback).unwrap() };
             loop {
-                if let Ok(changed) = enabled_receiver.has_changed() {
-                    if !changed {
-                        break;
-                    }
+                if !connected_receiver.try_recv().unwrap_or(true) {
+                    break;
                 }
+
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
 
-            let _ = unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) };
-
-            info!("Volume Provider stopped");
+            unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback).unwrap() };
+            tracing::info!("Volume Provider stopped");
         });
     }
+}
 
-    fn disable(&self) {
-        self.enabled_sender.send(false).unwrap_or_else(|e| error!("disable: {}", e));
+#[windows::core::implement(IAudioEndpointVolumeCallback)]
+struct VolumeChangeCallback {
+    push_sender: mpsc::Sender<Vec<u8>>,
+}
+
+impl IAudioEndpointVolumeCallback_Impl for VolumeChangeCallback {
+    fn OnNotify(&self, notification_data: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> Result<(), windows::core::Error> {
+        let volume = (unsafe { *notification_data }).fMasterVolume;
+        VolumeProvider::send(volume, &self.push_sender);
+        return Ok(());
     }
 }
