@@ -1,0 +1,32 @@
+[package]
+name = "qmk-hid-host"
+version = "0.0.0"
+edition = "2021"
+authors = ["zzeneg"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = "0.4.26"
+hidapi = "2.4.0"
+tokio = { version = "1.29.1", features = ["sync"] }
+async-std = "1.7.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dependencies.windows]
+version = "0.48"
+features = [
+    "implement",
+    "Foundation",
+    "Media_Control",
+    "Win32_Globalization",
+    "Win32_Foundation",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_TextServices",
+    "Win32_UI_WindowsAndMessaging",
+]
