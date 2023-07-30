@@ -1,22 +1,30 @@
 use hidapi::{HidApi, HidDevice, HidError};
 use tokio::sync::{broadcast, mpsc};
 
+use crate::config::Device;
+
 pub struct Keyboard {
-    pid: u16,
+    product_id: u16,
     usage: u16,
     usage_page: u16,
+    reconnect_delay: u64,
 }
 
 impl Keyboard {
-    pub fn new(pid: u16, usage: u16, usage_page: u16) -> Self {
-        return Self { pid, usage, usage_page };
+    pub fn new(device: Device, reconnect_delay: u64) -> Self {
+        return Self {
+            product_id: device.product_id,
+            usage: device.usage,
+            usage_page: device.usage_page,
+            reconnect_delay,
+        };
     }
 
-    fn get_device(pid: &u16, usage: &u16, usage_page: &u16) -> Result<HidDevice, HidError> {
+    fn get_device(product_id: &u16, usage: &u16, usage_page: &u16) -> Result<HidDevice, HidError> {
         let hid_api = HidApi::new()?;
         let devices = hid_api.device_list();
         for device_info in devices {
-            if device_info.product_id() == *pid && device_info.usage() == *usage && device_info.usage_page() == *usage_page {
+            if device_info.product_id() == *product_id && device_info.usage() == *usage && device_info.usage_page() == *usage_page {
                 let device = device_info.open_device(&hid_api)?;
                 return Ok(device);
             }
@@ -26,9 +34,10 @@ impl Keyboard {
     }
 
     pub fn connect(&self) -> (broadcast::Sender<bool>, mpsc::Sender<Vec<u8>>) {
-        let pid = self.pid;
+        let pid = self.product_id;
         let usage = self.usage;
         let usage_page = self.usage_page;
+        let reconnect_delay = self.reconnect_delay;
         let (data_sender, mut data_receiver) = mpsc::channel::<Vec<u8>>(32);
         let (connected_sender, _) = broadcast::channel::<bool>(32);
         let internal_connected_sender = connected_sender.clone();
@@ -54,7 +63,7 @@ impl Keyboard {
                     }
                 }
 
-                std::thread::sleep(std::time::Duration::from_secs(5));
+                std::thread::sleep(std::time::Duration::from_millis(reconnect_delay));
             }
         });
 

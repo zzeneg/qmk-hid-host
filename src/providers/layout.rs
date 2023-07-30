@@ -25,8 +25,7 @@ unsafe fn get_layout() -> String {
     return layout_name;
 }
 
-fn send_data(value: &String, data_sender: &mpsc::Sender<Vec<u8>>) {
-    let layouts: [&str; 2] = ["en", "ru"];
+fn send_data(value: &String, layouts: &Vec<String>, data_sender: &mpsc::Sender<Vec<u8>>) {
     let index = layouts.into_iter().position(|r| r == value).unwrap();
     let data = vec![DataType::Layout as u8, index as u8];
     data_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
@@ -35,13 +34,15 @@ fn send_data(value: &String, data_sender: &mpsc::Sender<Vec<u8>>) {
 pub struct LayoutProvider {
     data_sender: mpsc::Sender<Vec<u8>>,
     connected_sender: broadcast::Sender<bool>,
+    layouts: Vec<String>,
 }
 
 impl LayoutProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
+    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>, layouts: Vec<String>) -> Box<dyn Provider> {
         let provider = LayoutProvider {
             data_sender,
             connected_sender,
+            layouts,
         };
         return Box::new(provider);
     }
@@ -52,6 +53,7 @@ impl Provider for LayoutProvider {
         tracing::info!("Layout Provider started");
         let data_sender = self.data_sender.clone();
         let connected_sender = self.connected_sender.clone();
+        let layouts = self.layouts.clone();
         std::thread::spawn(move || {
             let mut connected_receiver = connected_sender.subscribe();
             let mut synced_layout = "".to_string();
@@ -63,7 +65,7 @@ impl Provider for LayoutProvider {
                 let layout = unsafe { get_layout() };
                 if synced_layout != layout {
                     synced_layout = layout;
-                    send_data(&synced_layout, &data_sender);
+                    send_data(&synced_layout, &layouts, &data_sender);
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(100));
