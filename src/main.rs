@@ -2,6 +2,8 @@ mod data_type;
 mod keyboard;
 mod providers;
 
+use providers::{layout::LayoutProvider, media::MediaProvider};
+
 use crate::{
     keyboard::Keyboard,
     providers::{_base::Provider, time::TimeProvider, volume::VolumeProvider},
@@ -17,6 +19,8 @@ fn main() {
     let providers: Vec<Box<dyn Provider>> = vec![
         TimeProvider::new(data_sender.clone(), connected_sender.clone()),
         VolumeProvider::new(data_sender.clone(), connected_sender.clone()),
+        LayoutProvider::new(data_sender.clone(), connected_sender.clone()),
+        MediaProvider::new(data_sender.clone(), connected_sender.clone()),
     ];
 
     let mut is_connected = false;

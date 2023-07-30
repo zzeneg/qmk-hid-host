@@ -1,76 +1,105 @@
-// use std::{sync::mpsc::Sender, time::Instant};
+use async_std::task::block_on;
+use tokio::sync::{broadcast, mpsc};
 
-// use async_std::task::block_on;
+use windows::{
+    core::Error,
+    Foundation::TypedEventHandler,
+    Media::Control::{GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager},
+};
 
-// use windows::{
-//     core::{Error, HSTRING},
-//     Media::Control::{
-//         GlobalSystemMediaTransportControlsSessionManager,
-//         GlobalSystemMediaTransportControlsSessionMediaProperties,
-//     },
-// };
+use crate::data_type::DataType;
 
-// use crate::data_type::DataType;
+use super::_base::Provider;
 
-// use super::_base::Provider;
+async fn get_media_session() -> Result<GlobalSystemMediaTransportControlsSession, Error> {
+    let mp = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()?.await?;
+    let session = mp.GetCurrentSession();
+    return session;
+}
 
-// pub struct MediaProvider {
-//     enabled: bool,
-//     sender: Sender<Vec<u8>>,
-// }
+async fn get_media_data(media_session: &GlobalSystemMediaTransportControlsSession) -> Result<(String, String), Error> {
+    let media_properties = media_session.TryGetMediaPropertiesAsync()?.await?;
+    let artist = media_properties.Artist().unwrap().to_string();
+    let title = media_properties.Title().unwrap().to_string();
 
-// impl MediaProvider {
-//     async fn get_media_properties(
-//         &self,
-//     ) -> Result<GlobalSystemMediaTransportControlsSessionMediaProperties, Error> {
-//         let mp = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()?.await?;
-//         let session = mp.GetCurrentSession()?;
-//         let properties = session.TryGetMediaPropertiesAsync()?.await?;
-//         Ok(properties)
-//     }
+    return Ok((artist, title));
+}
 
-//     fn hstring_to_vec(&self, str: HSTRING) -> Vec<u8> {
-//         let mut data = str.to_string().into_bytes();
-//         data.truncate(30);
-//         data.insert(0, data.len() as u8);
-//         return data;
-//     }
-// }
+fn send_data(data_type: DataType, value: &String, data_sender: &mpsc::Sender<Vec<u8>>) {
+    let mut data = value.to_string().into_bytes();
+    data.truncate(30);
+    data.insert(0, data.len() as u8);
+    data.insert(0, data_type as u8);
+    data_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+}
 
-// impl Provider for MediaProvider {
-//     fn new(sender: Sender<Vec<u8>>) -> Self {
-//         Self {
-//             enabled: false,
-//             sender,
-//         }
-//     }
+pub struct MediaProvider {
+    data_sender: mpsc::Sender<Vec<u8>>,
+    connected_sender: broadcast::Sender<bool>,
+}
 
-//     fn enable(&mut self) {
-//         self.enabled = true;
-//         let mut start = Instant::now();
-//         self.send();
-//         while self.enabled {
-//             if start.elapsed().as_secs() > 30 {
-//                 start = Instant::now();
-//                 self.send();
-//             }
-//         }
-//     }
+impl MediaProvider {
+    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
+        let provider = MediaProvider {
+            data_sender,
+            connected_sender,
+        };
+        return Box::new(provider);
+    }
+}
 
-//     fn disable(&mut self) {
-//         self.enabled = false;
-//     }
+impl Provider for MediaProvider {
+    fn start(&self) {
+        tracing::info!("Media Provider started");
 
-//     fn send(&self) {
-//         let properties = block_on(self.get_media_properties()).unwrap();
-//         let artist = properties.Artist().unwrap();
-//         let mut artist_data = self.hstring_to_vec(artist);
-//         artist_data.insert(0, DataType::MediaArtist as u8);
-//         let _ = self.sender.send(artist_data.to_vec());
+        let data_sender = self.data_sender.clone();
+        let connected_sender = self.connected_sender.clone();
+        std::thread::spawn(move || {
+            let mut connected_receiver = connected_sender.subscribe();
+            let mut synced_artist = "".to_string();
+            let mut synced_title = "".to_string();
 
-//         let title = properties.Title().unwrap();
-//         let mut title_data = self.hstring_to_vec(title);
-//         title_data.insert(0, DataType::MediaTitle as u8);
-//         let _ = self.sender.send(title_data.to_vec());
-//     }
-// }
+            if let Ok(media_session) = block_on(get_media_session()) {
+                if let Ok((artist, title)) = block_on(get_media_data(&media_session)) {
+                    synced_artist = artist;
+                    send_data(DataType::MediaArtist, &synced_artist, &data_sender);
+                    synced_title = title;
+                    send_data(DataType::MediaTitle, &synced_title, &data_sender);
+                }
+
+                let handler = &TypedEventHandler::new(move |_session, _| {
+                    if let Some(session) = _session {
+                        if let Ok((artist, title)) = block_on(get_media_data(session)) {
+                            if synced_artist != artist {
+                                synced_artist = artist;
+                                send_data(DataType::MediaArtist, &synced_artist, &data_sender);
+                            }
+
+                            if synced_title != title {
+                                synced_title = title;
+                                send_data(DataType::MediaTitle, &synced_title, &data_sender);
+                            }
+                        }
+                    }
+
+                    return Ok(());
+                });
+                let token = media_session.MediaPropertiesChanged(handler).unwrap();
+
+                loop {
+                    if !connected_receiver.try_recv().unwrap_or(true) {
+                        break;
+                    }
+
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+
+                media_session
+                    .RemoveMediaPropertiesChanged(token)
+                    .unwrap_or_else(|e| tracing::error!("{}", e));
+            }
+
+            tracing::info!("Media Provider stopped");
+        });
+    }
+}
