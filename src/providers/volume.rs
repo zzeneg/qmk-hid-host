@@ -26,7 +26,7 @@ unsafe fn get_volume_endpoint() -> IAudioEndpointVolume {
 }
 
 fn send_data(value: &f32, push_sender: &mpsc::Sender<Vec<u8>>) {
-    let volume = (value * 100.0) as u8;
+    let volume = (value * 100.0).round() as u8;
     let data = vec![DataType::Volume as u8, volume];
     push_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
 }

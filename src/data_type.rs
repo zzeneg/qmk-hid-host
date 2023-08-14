@@ -1,5 +1,5 @@
 pub enum DataType {
-    Time,
+    Time = 0xAA, // random value that does not conflict with VIA/VIAL, must match firmware
     Volume,
     Layout,
     MediaArtist,
