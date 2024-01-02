@@ -12,7 +12,9 @@ use crate::{
 };
 
 fn main() {
-    let tracing_subscriber = tracing_subscriber::fmt().finish();
+    let tracing_subscriber = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .finish();
     let _ = tracing::subscriber::set_global_default(tracing_subscriber);
 
     let config = get_config();

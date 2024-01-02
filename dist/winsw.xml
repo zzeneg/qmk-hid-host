@@ -1,0 +1,7 @@
+<service>
+  <id>QMKHIDHost</id>
+  <name>QMK HID Host</name>
+  <description></description>
+  <env name="RUST_LOG" value="warn"/>
+  <executable>qmk-hid-host.exe</executable>
+</service>
