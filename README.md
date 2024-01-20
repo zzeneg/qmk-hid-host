@@ -38,14 +38,8 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 
 `set RUST_LOG=debug&& qmk-hid-host.exe`
 
-#### As a Windows service
-
-Windows service is supported using [WinSW](https://github.com/winsw/winsw) application. For full options or in case of any issues please refer to [documentation](https://github.com/winsw/winsw/tree/master?tab=readme-ov-file#documentation).
-
-1. Open console and run `winsw install`, followed by `winsw start`. Service should automatically start with Windows.
-2. If needed, edit config and restart the service using `winsw stop` and `winsw start`.
-
 ## Changelog
 
+- 2024-01-21 - remove run as windows service
 - 2024-01-02 - support RUST_LOG, run as windows service
 - 2023-07-30 - rewritten to Rust
