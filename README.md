@@ -17,18 +17,33 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## How to run it
 
+Download all files from [dist](dist/) folder.
+
+#### Configuration
+
+Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify `qmk-hid-host.json`.
+
+- `device` section contains information about keyboard. All values are **decimal**, make sure sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
+  - `productId` - `pid` from your keyboard's `info.json`
+  - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
+- `layouts` - list of supported keyboard layouts in two-letter format
+- `reconnectDelay` - delay between reconnecting attempts in milliseconds
+
 #### Manually
 
-1. Download and start [qmk-hid-host.exe](dist/qmk-hid-host.exe)
-2. If needed, edit config in `qmk-hid-host.json` and restart the app.
+1. Start [qmk-hid-host.exe](dist/qmk-hid-host.exe)
+2. If needed, edit config and restart the app.
+
+#### Debug mode
+
+`set RUST_LOG=debug&& qmk-hid-host.exe`
 
 #### As a Windows service
 
 Windows service is supported using [WinSW](https://github.com/winsw/winsw) application. For full options or in case of any issues please refer to [documentation](https://github.com/winsw/winsw/tree/master?tab=readme-ov-file#documentation).
 
-1. Download all files from [dist](dist/) folder.
-2. Open console and run `winsw install`, followed by `winsw start`. Service should automatically start with windows.
-3. If needed, edit config in `qmk-hid-host.json` and restart the service using `winsw stop` and `winsw start`.
+1. Open console and run `winsw install`, followed by `winsw start`. Service should automatically start with Windows.
+2. If needed, edit config and restart the service using `winsw stop` and `winsw start`.
 
 ## Changelog
 
