@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(target_os = "windows", feature = "silent", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+
 mod config;
 mod data_type;
 mod keyboard;

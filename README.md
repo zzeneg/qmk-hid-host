@@ -23,26 +23,27 @@ Download all files from [dist](dist/) folder.
 
 Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify `qmk-hid-host.json`.
 
-- `device` section contains information about keyboard. All values are **decimal**, make sure sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
+- `device` section contains information about keyboard. All values are **decimal**, make sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
   - `productId` - `pid` from your keyboard's `info.json`
   - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format
 - `reconnectDelay` - delay between reconnecting attempts in milliseconds
 
-#### Manually
+#### Manual/Debug mode
 
 1. Start [qmk-hid-host.exe](dist/qmk-hid-host.exe)
 2. If needed, edit config and restart the app
 
-#### Debug mode
+#### Silent mode
 
-`set RUST_LOG=debug&& qmk-hid-host.exe`
+When you verified that the application works with your keyboard, you can use [qmk-hid-host.silent.exe](dist/qmk-hid-host.silent.exe) instead (like add it to Startup). It does not have a console or logs, and can be killed only from Task Manager.
 
 ## Development
 
 1. Install Rust
-1. Run `cargo run`
-1. If needed, edit `qmk-hid-host.json` in root folder and run again
+2. Run `cargo run`
+3. If needed, edit `qmk-hid-host.json` in root folder and run again
+4. To publish new executable versions, install [cargo-make](https://github.com/sagiegurari/cargo-make) with `cargo install cargo-make` and run `cargo make dist`
 
 ## Changelog
 

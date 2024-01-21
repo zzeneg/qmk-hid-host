@@ -1,0 +1,45 @@
+[env]
+CARGO_MAKE_PROJECT_NAME = "qmk-hid-host"
+CARGO_MAKE_OUTPUT_DIRECTORY_NAME = "dist"
+
+[tasks.build-release-no-features]
+env = {"CARGO_MAKE_CARGO_BUILD_TEST_FLAGS" = ""}
+run_task = "build-release"
+
+[tasks.build-release-with-silent]
+env = {"CARGO_MAKE_CARGO_BUILD_TEST_FLAGS" = "--features silent"}
+run_task = "build-release"
+
+[tasks.dist-default]
+env.CARGO_MAKE_OUTPUT_TYPE = ""
+run_task = [{ name = ["build-release-no-features", "copy-dist"] }]
+
+[tasks.dist-with-silent]
+env.CARGO_MAKE_OUTPUT_TYPE = "silent"
+run_task = [{ name = ["build-release-with-silent", "copy-dist"] }]
+
+[tasks.dist]
+run_task = [{ name = ["dist-with-silent", "dist-default"] }]
+
+[tasks.copy-dist]
+env.TARGET_RELEASE_DIRECTORY = "target/release"
+script = '''
+#!@duckscript
+executable_file = set ${CARGO_MAKE_PROJECT_NAME}
+
+output_executable_file = set ${executable_file}
+if not is_empty ${CARGO_MAKE_OUTPUT_TYPE}
+    output_executable_file = set ${output_executable_file}.${CARGO_MAKE_OUTPUT_TYPE}
+end
+
+if is_windows
+    executable_file = set "${executable_file}.exe"
+    output_executable_file = set "${output_executable_file}.exe"
+end
+
+echo Copying executable ${executable_file} to ${CARGO_MAKE_OUTPUT_DIRECTORY_NAME}/${output_executable_file}...
+
+mkdir ${CARGO_MAKE_OUTPUT_DIRECTORY_NAME}
+
+cp ${TARGET_RELEASE_DIRECTORY}/${executable_file} ${CARGO_MAKE_OUTPUT_DIRECTORY_NAME}/${output_executable_file}
+'''
