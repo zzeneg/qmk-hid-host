@@ -1,0 +1,68 @@
+---
+name: pre-release
+
+on:
+  push:
+    branches: ['main']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build and Publish
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Test
+        run: cargo test
+
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+
+      - name: Publish to dist
+        uses: actions-rs/cargo@v1
+        with:
+          command: make
+          args: dist
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist
+          name: dist
+
+  pre-release:
+    name: Pre-Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'write'
+      packages: 'write'
+      pull-requests: 'read'
+
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Create Release
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: '${{ secrets.GITHUB_TOKEN }}'
+          automatic_release_tag: 'latest'
+          prerelease: true
+          title: 'Latest Build'
+          files: dist/**/*
