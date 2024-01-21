@@ -6,6 +6,5 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
-  },
-  "rust-analyzer.rustfmt.extraArgs": ["--config", "max_width=140"]
+  }
 }
