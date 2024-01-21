@@ -46,6 +46,6 @@ When you verified that the application works with your keyboard, you can use `qm
 
 ## Changelog
 
-- 2024-01-21 - remove run as windows service
+- 2024-01-21 - remove run as windows service, add silent version instead
 - 2024-01-02 - support RUST_LOG, run as windows service
 - 2023-07-30 - rewritten to Rust
