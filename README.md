@@ -32,11 +32,17 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 #### Manually
 
 1. Start [qmk-hid-host.exe](dist/qmk-hid-host.exe)
-2. If needed, edit config and restart the app.
+2. If needed, edit config and restart the app
 
 #### Debug mode
 
 `set RUST_LOG=debug&& qmk-hid-host.exe`
+
+## Development
+
+1. Install Rust
+1. Run `cargo run`
+1. If needed, edit `qmk-hid-host.json` in root folder and run again
 
 ## Changelog
 

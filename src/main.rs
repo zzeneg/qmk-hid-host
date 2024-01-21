@@ -4,17 +4,14 @@ mod keyboard;
 mod providers;
 
 use config::get_config;
-use providers::{layout::LayoutProvider, media::MediaProvider};
-
-use crate::{
-    keyboard::Keyboard,
-    providers::{_base::Provider, time::TimeProvider, volume::VolumeProvider},
-};
+use keyboard::Keyboard;
+use providers::{_base::Provider, layout::LayoutProvider, media::MediaProvider, time::TimeProvider, volume::VolumeProvider};
 
 fn main() {
-    let tracing_subscriber = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .finish();
+    let env_filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
+        .from_env_lossy();
+    let tracing_subscriber = tracing_subscriber::fmt().with_env_filter(env_filter).finish();
     let _ = tracing::subscriber::set_global_default(tracing_subscriber);
 
     let config = get_config();

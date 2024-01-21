@@ -21,7 +21,7 @@ pub fn get_config() -> Config {
             usage: 0x61,
             usage_page: 0xff60,
         },
-        layouts: vec!["en".to_string(), "ru".to_string()],
+        layouts: vec!["en".to_string()],
         reconnect_delay: 5000,
     };
 
