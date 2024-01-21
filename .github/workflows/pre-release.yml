@@ -4,6 +4,8 @@ name: pre-release
 on:
   push:
     branches: ['main']
+    paths-ignore:
+      - '**.md'
 
 env:
   CARGO_TERM_COLOR: always

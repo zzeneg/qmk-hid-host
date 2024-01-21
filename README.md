@@ -17,7 +17,7 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## How to run it
 
-Download all files from [dist](dist/) folder.
+Download all files from [latest release](https://github.com/zzeneg/qmk-hid-host/releases/tag/latest).
 
 #### Configuration
 
@@ -31,19 +31,18 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 
 #### Manual/Debug mode
 
-1. Start [qmk-hid-host.exe](dist/qmk-hid-host.exe)
+1. Start `qmk-hid-host.exe`
 2. If needed, edit config and restart the app
 
 #### Silent mode
 
-When you verified that the application works with your keyboard, you can use [qmk-hid-host.silent.exe](dist/qmk-hid-host.silent.exe) instead (like add it to Startup). It does not have a console or logs, and can be killed only from Task Manager.
+When you verified that the application works with your keyboard, you can use `qmk-hid-host.silent.exe` instead (like add it to Startup). It does not have a console or logs, and can be killed only from Task Manager.
 
 ## Development
 
 1. Install Rust
 2. Run `cargo run`
 3. If needed, edit `qmk-hid-host.json` in root folder and run again
-4. To publish new executable versions, install [cargo-make](https://github.com/sagiegurari/cargo-make) with `cargo install cargo-make` and run `cargo make dist`
 
 ## Changelog
 
