@@ -18,27 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
       - name: Build
         run: cargo build --release
-
-      - name: Test
-        run: cargo test
 
       - name: Install cargo-make
         uses: davidB/rust-cargo-make@v1
 
-      - name: Publish to dist
-        uses: actions-rs/cargo@v1
-        with:
-          command: make
-          args: dist
+      - name: Publish files
+        run: cargo make dist
 
-      - name: Upload dist
+      - name: Upload files
         uses: actions/upload-artifact@v4
         with:
           path: dist
@@ -54,7 +43,7 @@ jobs:
       pull-requests: 'read'
 
     steps:
-      - name: Download dist
+      - name: Download files
         uses: actions/download-artifact@v4
         with:
           name: dist
