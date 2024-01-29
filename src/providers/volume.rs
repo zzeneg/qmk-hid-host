@@ -1,4 +1,11 @@
-use tokio::sync::{broadcast, mpsc};
+use pulsectl::controllers::DeviceControl;
+#[cfg(target_os = "linux")]
+use pulsectl::controllers::SinkController;
+use tokio::sync::{
+    broadcast::{self, Receiver},
+    mpsc::{self, Sender},
+};
+#[cfg(target_os = "windows")]
 use windows::Win32::{
     Media::Audio::{
         eMultimedia, eRender,
@@ -12,17 +19,47 @@ use crate::data_type::DataType;
 
 use super::_base::Provider;
 
+#[cfg(target_os = "windows")]
 fn get_volume() -> f32 {
     let endpoint_volume = unsafe { get_volume_endpoint() };
     return unsafe { endpoint_volume.GetMasterVolumeLevelScalar() }.unwrap();
 }
 
+fn get_volume() -> f32 {
+    let mut handler = SinkController::create().unwrap();
+    if let Ok(default) = handler.get_default_device() {
+        let volume = default.volume.get().first().unwrap();
+        tracing::info!("volume {:?}", volume.0);
+        tracing::info!("base_volume {:?}", default.base_volume.0);
+        tracing::info!("result volume {:?}", volume.0 as f32 / default.base_volume.0 as f32);
+        return volume.0 as f32 / default.base_volume.0 as f32;
+    }
+
+    return 0f32;
+}
+
+#[cfg(target_os = "windows")]
 unsafe fn get_volume_endpoint() -> IAudioEndpointVolume {
     CoInitializeEx(None, COINIT_MULTITHREADED).unwrap_or_else(|e| tracing::error!("{}", e));
     let device_enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER).unwrap();
     let device: IMMDevice = device_enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia).unwrap();
     let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None).unwrap();
     return endpoint_volume;
+}
+
+#[cfg(target_os = "windows")]
+#[windows::core::implement(IAudioEndpointVolumeCallback)]
+struct VolumeChangeCallback {
+    push_sender: mpsc::Sender<Vec<u8>>,
+}
+
+#[cfg(target_os = "windows")]
+impl IAudioEndpointVolumeCallback_Impl for VolumeChangeCallback {
+    fn OnNotify(&self, notification_data: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> Result<(), windows::core::Error> {
+        let volume = (unsafe { *notification_data }).fMasterVolume;
+        send_data(&volume, &self.push_sender);
+        return Ok(());
+    }
 }
 
 fn send_data(value: &f32, push_sender: &mpsc::Sender<Vec<u8>>) {
@@ -55,32 +92,28 @@ impl Provider for VolumeProvider {
         let connected_sender = self.connected_sender.clone();
         std::thread::spawn(move || {
             let mut connected_receiver = connected_sender.subscribe();
-            let endpoint_volume = unsafe { get_volume_endpoint() };
-            let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender: data_sender }.into();
-            unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
-            loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
-                    break;
-                }
-
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-
-            unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
+            subscribe(data_sender, connected_receiver);
             tracing::info!("Volume Provider stopped");
         });
     }
 }
 
-#[windows::core::implement(IAudioEndpointVolumeCallback)]
-struct VolumeChangeCallback {
-    push_sender: mpsc::Sender<Vec<u8>>,
+#[cfg(target_os = "windows")]
+fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
+    let endpoint_volume = unsafe { get_volume_endpoint() };
+    let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender: data_sender }.into();
+    unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
+    loop {
+        if !connected_receiver.try_recv().unwrap_or(true) {
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
 }
 
-impl IAudioEndpointVolumeCallback_Impl for VolumeChangeCallback {
-    fn OnNotify(&self, notification_data: *mut AUDIO_VOLUME_NOTIFICATION_DATA) -> Result<(), windows::core::Error> {
-        let volume = (unsafe { *notification_data }).fMasterVolume;
-        send_data(&volume, &self.push_sender);
-        return Ok(());
-    }
+fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
+    // TODO
 }
