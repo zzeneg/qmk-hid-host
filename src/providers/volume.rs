@@ -1,6 +1,5 @@
-use pulsectl::controllers::DeviceControl;
 #[cfg(target_os = "linux")]
-use pulsectl::controllers::SinkController;
+use pulsectl::controllers::{DeviceControl, SinkController};
 use tokio::sync::{
     broadcast::{self, Receiver},
     mpsc::{self, Sender},
@@ -25,6 +24,7 @@ fn get_volume() -> f32 {
     return unsafe { endpoint_volume.GetMasterVolumeLevelScalar() }.unwrap();
 }
 
+#[cfg(target_os = "linux")]
 fn get_volume() -> f32 {
     let mut handler = SinkController::create().unwrap();
     if let Ok(default) = handler.get_default_device() {
@@ -91,7 +91,7 @@ impl Provider for VolumeProvider {
         let data_sender = self.data_sender.clone();
         let connected_sender = self.connected_sender.clone();
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
+            let connected_receiver = connected_sender.subscribe();
             subscribe(data_sender, connected_receiver);
             tracing::info!("Volume Provider stopped");
         });
@@ -114,6 +114,7 @@ fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool
     unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
 }
 
+#[cfg(target_os = "linux")]
 fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
     // TODO
 }
