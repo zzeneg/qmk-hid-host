@@ -6,7 +6,7 @@ use tokio::sync::{
 
 use crate::data_type::DataType;
 
-use super::_base::Provider;
+use super::super::_base::Provider;
 
 fn get_volume() -> f32 {
     let mut handler = SinkController::create().unwrap();
