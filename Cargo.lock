@@ -616,6 +616,7 @@ dependencies = [
  "async-std",
  "chrono",
  "hidapi",
+ "libpulse-binding",
  "pulsectl-rs",
  "serde",
  "serde_json",

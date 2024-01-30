@@ -1,3 +1,9 @@
+use std::borrow::{Borrow, BorrowMut};
+
+use libpulse_binding::{
+    context::{subscribe::Facility, Context, FlagSet},
+    mainloop::standard::{IterateResult, Mainloop},
+};
 use pulsectl::controllers::{DeviceControl, SinkController};
 use tokio::sync::{
     broadcast::{self, Receiver},
@@ -58,5 +64,47 @@ impl Provider for VolumeProvider {
 }
 
 fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
-    // TODO
+    let mut mainloop = Mainloop::new().unwrap();
+    let mut ctx = Context::new(&mainloop, "qmk-hid-host").unwrap();
+    ctx.connect(None, FlagSet::NOFLAGS, None).unwrap();
+    loop {
+        match mainloop.borrow_mut().iterate(false) {
+            IterateResult::Quit(_) | IterateResult::Err(_) => {
+                eprintln!("Iterate state was not success, quitting...");
+                return;
+            }
+            IterateResult::Success(_) => {}
+        }
+        match ctx.borrow().get_state() {
+            libpulse_binding::context::State::Ready => {
+                tracing::info!("Ready");
+                break;
+            }
+            libpulse_binding::context::State::Failed | libpulse_binding::context::State::Terminated => {
+                tracing::info!("Context state failed/terminated, quitting...");
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    ctx.set_subscribe_callback(Some(Box::new(move |_, _, _| {
+        let volume = get_volume();
+        send_data(&volume, &data_sender);
+    })));
+
+    ctx.subscribe(
+        Facility::Sink.to_interest_mask(), // Our interest mask
+        |e| tracing::info!("{:?}", e),     // We won’t bother doing anything in the success callback in this example
+    );
+
+    loop {
+        if !connected_receiver.try_recv().unwrap_or(true) {
+            break;
+        }
+
+        mainloop.iterate(false);
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 }
