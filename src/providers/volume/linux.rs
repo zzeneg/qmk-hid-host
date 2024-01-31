@@ -11,17 +11,15 @@ use crate::data_type::DataType;
 
 use super::super::_base::Provider;
 
-fn get_volume() -> f32 {
-    let mut controller = SinkController::create().unwrap();
+fn get_volume() -> Option<f32> {
+    let mut controller = SinkController::create().ok()?;
     if let Ok(default) = controller.get_default_device() {
-        let volume = default.volume.get().first().unwrap();
-        tracing::info!("volume {:?}", volume.0);
-        tracing::info!("base_volume {:?}", default.base_volume.0);
-        tracing::info!("result volume {:?}", volume.0 as f32 / default.base_volume.0 as f32);
-        return volume.0 as f32 / default.base_volume.0 as f32;
+        let device_volume = default.volume.get().first()?.0 as f32;
+        let base_volume = default.base_volume.0 as f32;
+        return Some(device_volume / base_volume);
     }
 
-    return 0f32;
+    return None;
 }
 
 fn send_data(value: &f32, push_sender: &mpsc::Sender<Vec<u8>>) {
@@ -48,7 +46,7 @@ impl VolumeProvider {
 impl Provider for VolumeProvider {
     fn start(&self) {
         tracing::info!("Volume Provider started");
-        let volume = get_volume();
+        let volume = get_volume().unwrap_or_default();
         send_data(&volume, &self.data_sender);
         let data_sender = self.data_sender.clone();
         let connected_sender = self.connected_sender.clone();
@@ -61,11 +59,11 @@ impl Provider for VolumeProvider {
 }
 
 fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
-    let controller = SinkController::create().unwrap();
+    let controller = SinkController::create().map_err(|e| tracing::error!("{}", e)).unwrap();
     let mut ctx = controller.handler.context.deref().borrow_mut();
 
     ctx.set_subscribe_callback(Some(Box::new(move |_, _, _| {
-        let volume = get_volume();
+        let volume = get_volume().unwrap_or_default();
         send_data(&volume, &data_sender);
     })));
 
