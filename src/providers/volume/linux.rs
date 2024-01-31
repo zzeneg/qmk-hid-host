@@ -1,9 +1,6 @@
-use std::borrow::{Borrow, BorrowMut};
+use std::ops::Deref;
 
-use libpulse_binding::{
-    context::{subscribe::Facility, Context, FlagSet},
-    mainloop::standard::{IterateResult, Mainloop},
-};
+use libpulse_binding::context::subscribe::Facility;
 use pulsectl::controllers::{DeviceControl, SinkController};
 use tokio::sync::{
     broadcast::{self, Receiver},
@@ -15,8 +12,8 @@ use crate::data_type::DataType;
 use super::super::_base::Provider;
 
 fn get_volume() -> f32 {
-    let mut handler = SinkController::create().unwrap();
-    if let Ok(default) = handler.get_default_device() {
+    let mut controller = SinkController::create().unwrap();
+    if let Ok(default) = controller.get_default_device() {
         let volume = default.volume.get().first().unwrap();
         tracing::info!("volume {:?}", volume.0);
         tracing::info!("base_volume {:?}", default.base_volume.0);
@@ -64,46 +61,22 @@ impl Provider for VolumeProvider {
 }
 
 fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
-    let mut mainloop = Mainloop::new().unwrap();
-    let mut ctx = Context::new(&mainloop, "qmk-hid-host").unwrap();
-    ctx.connect(None, FlagSet::NOFLAGS, None).unwrap();
-    loop {
-        match mainloop.borrow_mut().iterate(false) {
-            IterateResult::Quit(_) | IterateResult::Err(_) => {
-                eprintln!("Iterate state was not success, quitting...");
-                return;
-            }
-            IterateResult::Success(_) => {}
-        }
-        match ctx.borrow().get_state() {
-            libpulse_binding::context::State::Ready => {
-                tracing::info!("Ready");
-                break;
-            }
-            libpulse_binding::context::State::Failed | libpulse_binding::context::State::Terminated => {
-                tracing::info!("Context state failed/terminated, quitting...");
-                return;
-            }
-            _ => {}
-        }
-    }
+    let controller = SinkController::create().unwrap();
+    let mut ctx = controller.handler.context.deref().borrow_mut();
 
     ctx.set_subscribe_callback(Some(Box::new(move |_, _, _| {
         let volume = get_volume();
         send_data(&volume, &data_sender);
     })));
 
-    ctx.subscribe(
-        Facility::Sink.to_interest_mask(), // Our interest mask
-        |e| tracing::info!("{:?}", e),     // We won’t bother doing anything in the success callback in this example
-    );
+    ctx.subscribe(Facility::Sink.to_interest_mask(), |_| {});
 
     loop {
         if !connected_receiver.try_recv().unwrap_or(true) {
             break;
         }
 
-        mainloop.iterate(false);
+        controller.handler.mainloop.deref().borrow_mut().iterate(false);
 
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
