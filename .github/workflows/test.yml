@@ -26,6 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install dependencies
+        run: ./install-build-deps.sh
+
       - name: Build
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
