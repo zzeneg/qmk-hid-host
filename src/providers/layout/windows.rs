@@ -10,7 +10,7 @@ use windows::Win32::{
 
 use crate::data_type::DataType;
 
-use super::_base::Provider;
+use super::super::_base::Provider;
 
 unsafe fn get_layout() -> String {
     let focused_window = GetForegroundWindow();
