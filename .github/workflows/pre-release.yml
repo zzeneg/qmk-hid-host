@@ -31,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: dist
-          name: dist
+          name: windows
 
   build-ubuntu:
     name: '[Ubuntu] Build and Publish'
@@ -39,6 +39,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: ./install-build-deps.sh
 
       - name: Build
         run: cargo build --release
@@ -53,7 +56,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: dist
-          name: dist
+          name: ubuntu
 
   pre-release:
     name: Pre-Release
@@ -70,8 +73,8 @@ jobs:
       - name: Download files
         uses: actions/download-artifact@v4
         with:
-          name: dist
           path: dist
+          merge-multiple: true
 
       - name: Create Release
         uses: marvinpinto/action-automatic-releases@latest
