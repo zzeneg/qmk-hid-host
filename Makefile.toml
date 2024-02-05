@@ -19,7 +19,10 @@ env.CARGO_MAKE_OUTPUT_TYPE = "silent"
 run_task = [{ name = ["build-release-with-silent", "copy-dist"] }]
 
 [tasks.dist]
-run_task = [{ name = ["dist-with-silent", "dist-default"] }]
+run_task = "dist-default"
+
+[tasks.dist.windows]
+run_task = [{ name = ["dist-default", "dist-with-silent"] }]
 
 [tasks.copy-dist]
 env.TARGET_RELEASE_DIRECTORY = "target/release"

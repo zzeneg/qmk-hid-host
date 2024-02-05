@@ -1,9 +1,0 @@
-{
-  "device": {
-    "productId": 2116,
-    "usage": 97,
-    "usagePage": 65376
-  },
-  "layouts": ["en"],
-  "reconnectDelay": 5000
-}

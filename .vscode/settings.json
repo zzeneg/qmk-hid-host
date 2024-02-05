@@ -1,10 +1,11 @@
 {
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll": true
+    "source.fixAll": "explicit"
   },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
-  }
+  },
+  "cSpell.words": ["mainloop"]
 }

@@ -42,8 +42,9 @@ impl Keyboard {
         let (connected_sender, _) = broadcast::channel::<bool>(32);
         let internal_connected_sender = connected_sender.clone();
         std::thread::spawn(move || {
-            tracing::info!("Trying to connect...");
+            tracing::info!("Waiting for keyboard...");
             loop {
+                tracing::debug!("Trying to connect...");
                 if let Ok(device) = Self::get_device(&pid, &usage, &usage_page) {
                     let _ = &internal_connected_sender.send(true).unwrap();
                     tracing::info!("Connected to keyboard");
