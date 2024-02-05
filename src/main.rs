@@ -28,7 +28,7 @@ fn main() {
         TimeProvider::new(data_sender.clone(), connected_sender.clone()),
         VolumeProvider::new(data_sender.clone(), connected_sender.clone()),
         LayoutProvider::new(data_sender.clone(), connected_sender.clone(), config.layouts),
-        // MediaProvider::new(data_sender.clone(), connected_sender.clone()),
+        MediaProvider::new(data_sender.clone(), connected_sender.clone()),
     ];
 
     let mut is_connected = false;
