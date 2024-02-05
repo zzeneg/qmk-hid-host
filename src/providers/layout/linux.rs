@@ -1,12 +1,12 @@
-use std::{
-    ffi, mem,
-    ptr::{self},
-};
+use std::{ffi, mem, ptr};
 
 use crate::data_type::DataType;
 use breadx::{
     display::{Display, DisplayBase, DisplayConnection, DisplayExt, DisplayFunctionsExt},
-    protocol::xproto::{AtomEnum, ChangeWindowAttributesAux, EventMask},
+    protocol::{
+        xproto::{AtomEnum, ChangeWindowAttributesAux, EventMask},
+        Event,
+    },
 };
 use tokio::sync::{broadcast, mpsc};
 use x11::xlib::{XGetAtomName, XOpenDisplay, XkbAllocKeyboard, XkbGetNames, XkbGetState, _XkbStateRec};
@@ -21,19 +21,16 @@ fn get_layout() -> String {
         let mut state = mem::zeroed::<_XkbStateRec>();
         XkbGetState(display, 0x0100, &mut state);
         let current_group_index = state.group as usize;
-        tracing::info!("current_group_index: {}", current_group_index);
 
         XkbGetNames(display, 1 << 2, keyboard);
         let symbols_atom = keyboard.read().names.read().symbols;
         let symbols_ptr = XGetAtomName(display, symbols_atom);
-        let symbols = std::str::from_utf8(ffi::CStr::from_ptr(symbols_ptr).to_bytes()).unwrap();
+        let symbols = std::str::from_utf8(ffi::CStr::from_ptr(symbols_ptr).to_bytes()).unwrap_or_default();
         tracing::info!("symbols: {}", symbols);
 
-        let current_layout = symbols.split('+').nth(current_group_index + 1).unwrap();
-        tracing::info!("current_layout: {}", current_layout);
-
-        let current_layout_name = current_layout.split([':', '(']).next().unwrap().to_string();
-        tracing::info!("current_layout_name: {}", current_layout_name);
+        let current_layout = symbols.split('+').nth(current_group_index + 1).unwrap_or_default();
+        let current_layout_name = current_layout.split([':', '(']).next().unwrap_or_default().to_string();
+        tracing::info!("layout: {}", current_layout_name);
 
         return current_layout_name;
     };
@@ -73,44 +70,48 @@ impl Provider for LayoutProvider {
         let layout = get_layout();
         send_data(&layout, &self.layouts, &data_sender);
 
-        let mut connection = DisplayConnection::connect(None).unwrap();
-        let attributes = ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE);
-
-        connection.change_window_attributes(connection.screens()[0].root, attributes).ok();
-
         let layouts = self.layouts.clone();
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
-            let mut synced_layout = "".to_string();
-            loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
-                    break;
-                }
+            if let Ok(mut connection) = DisplayConnection::connect(None) {
+                let attributes = ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE);
+                let _ = connection.change_window_attributes(connection.screens()[0].root, attributes);
 
-                let event = connection.wait_for_event().unwrap();
-                match event {
-                    breadx::protocol::Event::PropertyNotify(e) => {
-                        let cookie = connection.get_atom_name(e.atom).unwrap();
-                        let name = connection.wait_for_reply(cookie).unwrap().name;
-                        let name_str = String::from_utf8(name).unwrap();
+                let mut connected_receiver = connected_sender.subscribe();
+                let mut synced_layout = String::default();
+                loop {
+                    if !connected_receiver.try_recv().unwrap_or(true) {
+                        break;
+                    }
 
-                        if name_str == "_NET_ACTIVE_WINDOW" {
-                            let property = connection
-                                .get_property(false, e.window, e.atom, u8::from(AtomEnum::WINDOW), 0, 4)
-                                .unwrap();
+                    let event = connection.wait_for_event();
+                    match event {
+                        Ok(Event::PropertyNotify(e)) => {
+                            let name_str = connection
+                                .get_atom_name(e.atom)
+                                .ok()
+                                .map(|cookie| connection.wait_for_reply(cookie).ok())
+                                .and_then(|reply| String::from_utf8(reply?.name).ok())
+                                .unwrap_or_default();
 
-                            let window_id = connection.wait_for_reply(property).unwrap().value32().unwrap().nth(0).unwrap();
+                            if name_str == "_NET_ACTIVE_WINDOW" {
+                                let window_id = connection
+                                    .get_property(false, e.window, e.atom, u8::from(AtomEnum::WINDOW), 0, 4)
+                                    .ok()
+                                    .map(|property| connection.wait_for_reply(property).ok())
+                                    .and_then(|reply| reply?.value32()?.next())
+                                    .unwrap_or_default();
 
-                            if window_id > 0 {
-                                let layout = get_layout();
-                                if synced_layout != layout {
-                                    synced_layout = layout;
-                                    send_data(&synced_layout, &layouts, &data_sender);
+                                if window_id > 0 {
+                                    let layout = get_layout();
+                                    if synced_layout != layout {
+                                        synced_layout = layout;
+                                        send_data(&synced_layout, &layouts, &data_sender);
+                                    }
                                 }
                             }
                         }
+                        _ => (),
                     }
-                    _ => (),
                 }
             }
 

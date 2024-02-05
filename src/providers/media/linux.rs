@@ -65,27 +65,25 @@ impl Provider for MediaProvider {
                     break;
                 }
 
-                if let Some(player) = PlayerFinder::new().ok().and_then(|x| x.find_active().ok()) {
+                if let Ok(Ok(player)) = PlayerFinder::new().map(|x| x.find_active()) {
                     if let Ok(metadata) = player.get_metadata() {
                         media_data = send_media_data(&metadata, &data_sender, &media_data);
                     }
 
                     if let Ok(events) = player.events() {
                         for event in events {
-                            if let Ok(event) = event {
-                                tracing::debug!("{:?}", event);
+                            tracing::debug!("{:?}", event);
 
-                                match event {
-                                    mpris::Event::Playing => {
-                                        if let Ok(metadata) = player.get_metadata() {
-                                            media_data = send_media_data(&metadata, &data_sender, &media_data);
-                                        }
-                                    }
-                                    mpris::Event::TrackChanged(metadata) => {
+                            match event {
+                                Ok(mpris::Event::Playing) => {
+                                    if let Ok(metadata) = player.get_metadata() {
                                         media_data = send_media_data(&metadata, &data_sender, &media_data);
                                     }
-                                    _ => (),
                                 }
+                                Ok(mpris::Event::TrackChanged(metadata)) => {
+                                    media_data = send_media_data(&metadata, &data_sender, &media_data);
+                                }
+                                _ => (),
                             }
                         }
                     }
