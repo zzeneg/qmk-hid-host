@@ -6,20 +6,22 @@ Requires support on keyboard side, currently is supported by [stront](https://gi
 
 ## Architecture
 
-Application is written in Rust which gives easy access to HID libraries, low-level Windows APIs and potential cross-platform compatibility. Currently only Windows is supported, as I don't use other operating systems. Please feel free to raise any PRs with Linux/MacOS support.
+Application is written in Rust which gives easy access to HID libraries, low-level Windows/Linux APIs and cross-platform compatibility.
 
-## Supported providers
+## Supported platforms/providers
 
-- Time
-- Volume
-- Input layout
-- Media artist and song title
+|         | Time               | Volume                          | Input layout             | Media info                 |
+| ------- | ------------------ | ------------------------------- | ------------------------ | -------------------------- |
+| Windows | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:       | :heavy_check_mark:         |
+| Linux   | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: (X11) | :heavy_check_mark: (D-Bus) |
+
+MacOS is not supported, as I don't own any Apple devices, feel free to raise PRs.
 
 ## How to run it
 
-Download all files from [latest release](https://github.com/zzeneg/qmk-hid-host/releases/tag/latest).
+All files are available in [latest release](https://github.com/zzeneg/qmk-hid-host/releases/tag/latest).
 
-#### Configuration
+### Configuration
 
 Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify `qmk-hid-host.json`.
 
@@ -28,6 +30,8 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
   - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format
 - `reconnectDelay` - delay between reconnecting attempts in milliseconds
+
+### Windows
 
 #### Manual/Debug mode
 
@@ -38,6 +42,19 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 
 When you verified that the application works with your keyboard, you can use `qmk-hid-host.silent.exe` instead (like add it to Startup). It does not have a console or logs, and can be killed only from Task Manager.
 
+### Linux
+
+1. Update `udev` rules by running script (remember to update `idVendor` and `idProduct` to your values first):
+
+   ```sh
+   sudo sh -c 'echo "KERNEL==\"hidraw*\", SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"feed\", ATTRS{idProduct}==\"0844\", MODE=\"0666\"" > /etc/udev/rules.d/99-qmkhidhost.rules'
+   ```
+
+   [More info](https://get.vial.today/manual/linux-udev.html)
+
+2. Reconnect keyboard
+3. Start `qmk-hid-host`, add it to autorun if needed
+
 ## Development
 
 1. Install Rust
@@ -46,6 +63,7 @@ When you verified that the application works with your keyboard, you can use `qm
 
 ## Changelog
 
+- 2024-02-06 - add Linux support
 - 2024-01-21 - remove run as windows service, add silent version instead
 - 2024-01-02 - support RUST_LOG, run as windows service
 - 2023-07-30 - rewritten to Rust
