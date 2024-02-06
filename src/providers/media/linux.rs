@@ -8,7 +8,7 @@ use super::super::_base::Provider;
 fn send_media_data(metadata: &Metadata, data_sender: &mpsc::Sender<Vec<u8>>, current: &(String, String)) -> (String, String) {
     let (mut artist, mut title) = current.clone();
 
-    let new_artist = metadata.artists().map(|x| x[0]).unwrap_or_default().to_string();
+    let new_artist = metadata.artists().and_then(|x| x.get(0).map(|x| x.to_string())).unwrap_or_default();
     if !new_artist.is_empty() && artist != new_artist {
         tracing::info!("new artist: {}", new_artist);
         artist = new_artist;
@@ -60,7 +60,7 @@ impl Provider for MediaProvider {
 
             let mut media_data = (String::default(), String::default());
 
-            loop {
+            'outer: loop {
                 if !connected_receiver.try_recv().unwrap_or(true) {
                     break;
                 }
@@ -73,6 +73,10 @@ impl Provider for MediaProvider {
                     if let Ok(events) = player.events() {
                         for event in events {
                             tracing::debug!("{:?}", event);
+
+                            if !connected_receiver.try_recv().unwrap_or(true) {
+                                break 'outer;
+                            }
 
                             match event {
                                 Ok(mpris::Event::Playing) => {
