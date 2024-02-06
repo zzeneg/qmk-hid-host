@@ -10,10 +10,12 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## Supported platforms/providers
 
-|         | Time               | Volume                          | Input layout             | Media info                 |
-| ------- | ------------------ | ------------------------------- | ------------------------ | -------------------------- |
-| Windows | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:       | :heavy_check_mark:         |
-| Linux   | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: (X11) | :heavy_check_mark: (D-Bus) |
+|              | Windows            | Linux                           |
+| ------------ | ------------------ | ------------------------------- |
+| Time         | :heavy_check_mark: | :heavy_check_mark:              |
+| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) |
+| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        |
+| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |
 
 MacOS is not supported, as I don't own any Apple devices, feel free to raise PRs.
 
@@ -28,7 +30,7 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 - `device` section contains information about keyboard. All values are **decimal**, make sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
   - `productId` - `pid` from your keyboard's `info.json`
   - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
-- `layouts` - list of supported keyboard layouts in two-letter format
+- `layouts` - list of supported keyboard layouts in two-letter format (app sends layout's index, not name)
 - `reconnectDelay` - delay between reconnecting attempts in milliseconds
 
 ### Windows
