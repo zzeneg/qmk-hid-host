@@ -2,30 +2,33 @@ use tokio::sync::{
     broadcast::{self, Receiver},
     mpsc::{self, Sender},
 };
-use windows::Win32::{
-    Media::Audio::{
-        eMultimedia, eRender,
-        Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl},
-        IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
+use windows::{
+    core::Error,
+    Win32::{
+        Media::Audio::{
+            eMultimedia, eRender,
+            Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl},
+            IMMDeviceEnumerator, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA,
+        },
+        System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED},
     },
-    System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED},
 };
 
 use crate::data_type::DataType;
 
 use super::super::_base::Provider;
 
-fn get_volume() -> f32 {
-    let endpoint_volume = unsafe { get_volume_endpoint() };
-    return unsafe { endpoint_volume.GetMasterVolumeLevelScalar() }.unwrap();
+fn get_volume() -> Result<f32, ()> {
+    let endpoint_volume = unsafe { get_volume_endpoint() }.map_err(|e| tracing::error!("Can not get volume endpoint: {}", e));
+    return unsafe { endpoint_volume?.GetMasterVolumeLevelScalar() }.map_err(|e| tracing::error!("Can not get volume level: {}", e));
 }
 
-unsafe fn get_volume_endpoint() -> IAudioEndpointVolume {
+unsafe fn get_volume_endpoint() -> Result<IAudioEndpointVolume, Error> {
     CoInitializeEx(None, COINIT_MULTITHREADED).unwrap_or_else(|e| tracing::error!("{}", e));
-    let device_enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER).unwrap();
-    let device: IMMDevice = device_enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia).unwrap();
-    let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None).unwrap();
-    return endpoint_volume;
+    let instance: windows::core::Result<IMMDeviceEnumerator> = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER);
+    return instance?
+        .GetDefaultAudioEndpoint(eRender, eMultimedia)?
+        .Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None);
 }
 
 #[windows::core::implement(IAudioEndpointVolumeCallback)]
@@ -65,29 +68,43 @@ impl VolumeProvider {
 impl Provider for VolumeProvider {
     fn start(&self) {
         tracing::info!("Volume Provider started");
-        let volume = get_volume();
-        send_data(&volume, &self.data_sender);
+        if let Ok(volume) = get_volume() {
+            send_data(&volume, &self.data_sender);
+        }
+
         let data_sender = self.data_sender.clone();
         let connected_sender = self.connected_sender.clone();
-        std::thread::spawn(move || {
+        std::thread::spawn(move || loop {
             let connected_receiver = connected_sender.subscribe();
-            subscribe(data_sender, connected_receiver);
-            tracing::info!("Volume Provider stopped");
+            if subscribe_and_wait(data_sender.clone(), connected_receiver) {
+                tracing::info!("Volume Provider stopped");
+                break;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(10000));
         });
     }
 }
 
-fn subscribe(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) {
-    let endpoint_volume = unsafe { get_volume_endpoint() };
-    let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender: data_sender }.into();
-    unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
-    loop {
-        if !connected_receiver.try_recv().unwrap_or(true) {
-            break;
+fn subscribe_and_wait(data_sender: Sender<Vec<u8>>, mut connected_receiver: Receiver<bool>) -> bool {
+    if let Ok(endpoint_volume) = unsafe { get_volume_endpoint() } {
+        let volume_callback: IAudioEndpointVolumeCallback = VolumeChangeCallback { push_sender: data_sender }.into();
+        if let Err(e) = unsafe { endpoint_volume.RegisterControlChangeNotify(&volume_callback) } {
+            tracing::error!("Can not register Volume callback: {}", e);
+            return false;
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        loop {
+            if !connected_receiver.try_recv().unwrap_or(true) {
+                break;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        let _ = unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) };
+        return true;
     }
 
-    unsafe { endpoint_volume.UnregisterControlChangeNotify(&volume_callback) }.unwrap_or_else(|e| tracing::error!("{}", e));
+    return false;
 }
