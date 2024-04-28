@@ -24,7 +24,7 @@ fn get_volume() -> Result<f32, ()> {
 }
 
 unsafe fn get_volume_endpoint() -> Result<IAudioEndpointVolume, Error> {
-    CoInitializeEx(None, COINIT_MULTITHREADED).unwrap_or_else(|e| tracing::error!("{}", e));
+    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
     let instance: windows::core::Result<IMMDeviceEnumerator> = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER);
     return instance?
         .GetDefaultAudioEndpoint(eRender, eMultimedia)?
