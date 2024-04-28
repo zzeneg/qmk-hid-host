@@ -15,43 +15,40 @@ fn get_manager() -> Result<GlobalSystemMediaTransportControlsSessionManager, ()>
         .map_err(|e| tracing::error!("Can not get Session Manager: {}", e));
 }
 
-fn get_session(manager: &GlobalSystemMediaTransportControlsSessionManager) -> Result<GlobalSystemMediaTransportControlsSession, ()> {
-    return manager
-        .GetCurrentSession()
-        .map_err(|e| tracing::error!("Can not get current Session: {}", e));
-}
-
 fn handle_session(
     session: &GlobalSystemMediaTransportControlsSession,
     data_sender: &mpsc::Sender<Vec<u8>>,
 ) -> Option<EventRegistrationToken> {
+    let mut synced_artist = String::new();
+    let mut synced_title = String::new();
     if let Some((artist, title)) = get_media_data(session) {
         send_data(DataType::MediaArtist, &artist, &data_sender);
         send_data(DataType::MediaTitle, &title, &data_sender);
-        let mut synced_artist = artist;
-        let mut synced_title = title;
-
-        let data_sender = data_sender.clone();
-        let session_handler = &TypedEventHandler::new(move |_session: &Option<GlobalSystemMediaTransportControlsSession>, _| {
-            if let Some((artist, title)) = get_media_data(_session.as_ref().unwrap()) {
-                if synced_artist != artist {
-                    synced_artist = artist;
-                    send_data(DataType::MediaArtist, &synced_artist, &data_sender);
-                }
-
-                if synced_title != title {
-                    synced_title = title;
-                    send_data(DataType::MediaTitle, &synced_title, &data_sender);
-                }
-            }
-
-            Ok(())
-        });
-
-        return session.MediaPropertiesChanged(session_handler).ok();
+        synced_artist = artist;
+        synced_title = title;
     }
 
-    None
+    let data_sender = data_sender.clone();
+    let session_handler = &TypedEventHandler::new(move |_session: &Option<GlobalSystemMediaTransportControlsSession>, _| {
+        if let Some((artist, title)) = get_media_data(_session.as_ref().unwrap()) {
+            if synced_artist != artist {
+                send_data(DataType::MediaArtist, &artist, &data_sender);
+                synced_artist = artist;
+            }
+
+            if synced_title != title {
+                send_data(DataType::MediaTitle, &title, &data_sender);
+                synced_title = title;
+            }
+        }
+
+        Ok(())
+    });
+
+    return session
+        .MediaPropertiesChanged(session_handler)
+        .map_err(|e| tracing::error!("Can not register MediaPropertiesChanged callback: {}", e))
+        .ok();
 }
 
 fn get_media_data(session: &GlobalSystemMediaTransportControlsSession) -> Option<(String, String)> {
@@ -63,7 +60,9 @@ fn get_media_data(session: &GlobalSystemMediaTransportControlsSession) -> Option
         let artist = media_properties.Artist().unwrap_or_default().to_string();
         let title = media_properties.Title().unwrap_or_default().to_string();
 
-        return Some((artist, title));
+        if !artist.is_empty() || !title.is_empty() {
+            return Some((artist, title));
+        }
     }
 
     None
@@ -103,12 +102,12 @@ impl Provider for MediaProvider {
             let mut session_token: Option<EventRegistrationToken> = None;
 
             if let Ok(manager) = get_manager() {
-                if let Ok(session) = get_session(&manager) {
+                if let Some(session) = manager.GetCurrentSession().ok() {
                     session_token = handle_session(&session, &data_sender);
                 }
 
                 let handler = TypedEventHandler::new(move |_manager: &Option<GlobalSystemMediaTransportControlsSessionManager>, _| {
-                    if let Ok(session) = get_session(_manager.as_ref().unwrap()) {
+                    if let Some(session) = _manager.as_ref().unwrap().GetCurrentSession().ok() {
                         if let Some(token) = session_token {
                             let _ = session.RemoveMediaPropertiesChanged(token);
                         }
@@ -119,7 +118,9 @@ impl Provider for MediaProvider {
                     Ok(())
                 });
 
-                let manager_token = manager.CurrentSessionChanged(&handler);
+                let manager_token = manager
+                    .CurrentSessionChanged(&handler)
+                    .map_err(|e| tracing::error!("Can not register CurrentSessionChanged callback: {}", e));
 
                 loop {
                     if !connected_receiver.try_recv().unwrap_or(true) {
