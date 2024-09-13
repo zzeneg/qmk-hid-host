@@ -34,3 +34,15 @@ jobs:
 
       - name: Run tests
         run: cargo test
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test

@@ -10,14 +10,14 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## Supported platforms/providers
 
-|              | Windows            | Linux                           |
-| ------------ | ------------------ | ------------------------------- |
-| Time         | :heavy_check_mark: | :heavy_check_mark:              |
-| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) |
-| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        |
-| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |
+|              | Windows            | Linux                           | macos              |
+| ------------ | ------------------ | ------------------------------- |--------------------|
+| Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
+| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) |                    |
+| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
+| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |                    |
 
-MacOS is not supported, as I don't own any Apple devices, feel free to raise PRs.
+MacOS is partially supported, as I don't own any Apple devices, feel free to raise PRs.
 
 ## How to run it
 
@@ -57,6 +57,9 @@ When you verified that the application works with your keyboard, you can use `qm
 2. Reconnect keyboard
 3. Start `qmk-hid-host`, add it to autorun if needed
 
+### MacOS
+1. Start `qmk-hid-host`, add it to autorun if needed
+
 ## Development
 
 1. Install Rust
@@ -64,7 +67,6 @@ When you verified that the application works with your keyboard, you can use `qm
 3. If needed, edit `qmk-hid-host.json` in root folder and run again
 
 ## Changelog
-
 - 2024-02-06 - add Linux support
 - 2024-01-21 - remove run as windows service, add silent version instead
 - 2024-01-02 - support RUST_LOG, run as windows service

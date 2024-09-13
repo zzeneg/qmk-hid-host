@@ -58,11 +58,34 @@ jobs:
           path: dist
           name: ubuntu
 
+  build-macos:
+    name: '[Macos] Build and Publish'
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+
+      - name: Publish files
+        run: cargo make dist
+
+      - name: Upload files
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist
+          name: macos
+
   pre-release:
     name: Pre-Release
     needs:
       - build-windows
       - build-ubuntu
+      - build-macos
     runs-on: ubuntu-latest
     permissions:
       contents: 'write'
