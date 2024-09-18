@@ -22,22 +22,17 @@ run_task = [{ name = ["build-release-with-silent", "copy-dist"] }]
 run_task = "dist-default"
 
 [tasks.dist.windows]
+env = { "EXECUTABLE_EXTENSION" = ".exe" }
 run_task = [{ name = ["dist-default", "dist-with-silent"] }]
 
 [tasks.copy-dist]
 env.TARGET_RELEASE_DIRECTORY = "target/release"
 script = '''
 #!@duckscript
-executable_file = set ${CARGO_MAKE_PROJECT_NAME}
-
-output_executable_file = set ${executable_file}
+executable_file = set ${CARGO_MAKE_PROJECT_NAME}${EXECUTABLE_EXTENSION}
+output_executable_file = set ${CARGO_MAKE_PROJECT_NAME}${EXECUTABLE_EXTENSION}
 if not is_empty ${CARGO_MAKE_OUTPUT_TYPE}
-    output_executable_file = set ${output_executable_file}.${CARGO_MAKE_OUTPUT_TYPE}
-end
-
-if is_windows
-    executable_file = set "${executable_file}.exe"
-    output_executable_file = set "${output_executable_file}.exe"
+    output_executable_file = set ${CARGO_MAKE_PROJECT_NAME}.${CARGO_MAKE_OUTPUT_TYPE}${EXECUTABLE_EXTENSION}
 end
 
 echo Copying executable ${executable_file} to ${CARGO_MAKE_OUTPUT_DIRECTORY_NAME}/${output_executable_file}...
