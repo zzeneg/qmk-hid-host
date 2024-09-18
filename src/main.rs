@@ -10,7 +10,11 @@ mod providers;
 
 use config::get_config;
 use keyboard::Keyboard;
-use providers::{_base::Provider, layout::LayoutProvider, media::MediaProvider, time::TimeProvider, volume::VolumeProvider};
+#[cfg(not(target_os = "macos"))]
+use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, media::MediaProvider,  volume::VolumeProvider};
+
+#[cfg(target_os = "macos")]
+use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider};
 
 fn main() {
     let env_filter = tracing_subscriber::EnvFilter::builder()
@@ -24,6 +28,13 @@ fn main() {
     let keyboard = Keyboard::new(config.device, config.reconnect_delay);
     let (connected_sender, data_sender) = keyboard.connect();
 
+    #[cfg(target_os = "macos")]
+    let providers: Vec<Box<dyn Provider>> = vec![
+        TimeProvider::new(data_sender.clone(), connected_sender.clone()),
+        LayoutProvider::new(data_sender.clone(), connected_sender.clone(), config.layouts),
+    ];
+
+    #[cfg(not(target_os = "macos"))]
     let providers: Vec<Box<dyn Provider>> = vec![
         TimeProvider::new(data_sender.clone(), connected_sender.clone()),
         VolumeProvider::new(data_sender.clone(), connected_sender.clone()),
