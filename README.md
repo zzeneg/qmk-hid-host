@@ -13,7 +13,7 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 |              | Windows            | Linux                           | macos              |
 | ------------ | ------------------ | ------------------------------- |--------------------|
 | Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
-| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) |                    |
+| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: |
 | Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
 | Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |                    |
 
@@ -58,7 +58,24 @@ When you verified that the application works with your keyboard, you can use `qm
 3. Start `qmk-hid-host`, add it to autorun if needed
 
 ### MacOS
-1. Start `qmk-hid-host`, add it to autorun if needed
+1. Download `qmk-hid-host`
+2. Modify `qmk-hid-host.json`
+3. Add your layouts, for example:
+```
+"layouts": [
+      "ABC", "Russian"
+],
+```
+if you don't know what layout are installed in you system, run qmk-hid-host with the layouts listed above, change lang and look at terminal output:
+```
+INFO qmk_hid_host::providers::layout::macos: new layout: 'ABC', layout list: ["ABC", "Russian"]
+INFO qmk_hid_host::providers::layout::macos: new layout: 'Russian', layout list: ["ABC", "Russian"]
+```
+"new layout:" is what you need
+4. start `qmk-hid-host` from directory where your `qmk-hid-host.json` is located
+5. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
+   1. You're wrong with productId in your config
+   2. Close Vial app and try again
 
 ## Development
 
