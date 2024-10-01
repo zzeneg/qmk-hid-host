@@ -30,6 +30,11 @@ mpris = "2.0.1"
 core-foundation = "0.10"
 core-foundation-sys = "0.8.7"
 libc = "0.2"
+objc2 = {version = "0.5.2", features = ["default"]}
+objc2-foundation = { version = "0.2.2", features = ["all"] }
+block2 = "0.5.1"
+coreaudio-sys = "0.2.16"
+coreaudio-rs = "0.12.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 [dependencies.windows]

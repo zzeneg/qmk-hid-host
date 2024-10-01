@@ -1,13 +1,8 @@
 use crate::data_type::DataType;
 use core_foundation::base::{CFRelease, TCFType};
 use core_foundation::string::{CFString, CFStringRef};
-use core_foundation_sys::runloop::{kCFRunLoopDefaultMode, CFRunLoopRunInMode};
 use libc::c_void;
-use std::sync::{Arc, Mutex};
-use core_foundation_sys::base::Boolean;
-use core_foundation_sys::date::CFTimeInterval;
 use tokio::sync::{broadcast, mpsc};
-
 use super::super::_base::Provider;
 
 #[link(name = "Carbon", kind = "framework")]
@@ -15,6 +10,7 @@ extern "C" {
     fn TISCopyCurrentKeyboardLayoutInputSource() -> *mut c_void;
     fn TISGetInputSourceProperty(input_source: *mut c_void, key: CFStringRef) -> *mut CFStringRef;
 }
+
 fn get_keyboard_layout() -> Option<String> {
     unsafe {
 
@@ -77,33 +73,23 @@ impl Provider for LayoutProvider {
         let connected_sender = self.connected_sender.clone();
         let mut synced_layout = "".to_string();
 
-        let is_connected = Arc::new(Mutex::new(true));
-        let is_connected_ref = is_connected.clone();
         std::thread::spawn(move || {
             let mut connected_receiver = connected_sender.subscribe();
             loop {
                 if !connected_receiver.try_recv().unwrap_or(true) {
-                    let mut is_connected = is_connected_ref.lock().unwrap();
-                    *is_connected = false;
                     break;
                 }
-
+                if let Some(layout) = get_keyboard_layout() {
+                    let lang = layout.split('.').last().unwrap().to_string();
+                    if synced_layout != lang {
+                        synced_layout = lang;
+                        send_data(&synced_layout, &layouts, &data_sender);
+                    }
+                }
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }}
         );
-        loop {
-            if !*(is_connected.lock().unwrap()) {
-                break;
-            }
-            if let Some(layout) = get_keyboard_layout() {
-                let lang = layout.split('.').last().unwrap().to_string();
-                if synced_layout != lang {
-                    synced_layout = lang;
-                    send_data(&synced_layout, &layouts, &data_sender);
-                }
-                }
-            unsafe {CFRunLoopRunInMode(kCFRunLoopDefaultMode, CFTimeInterval::from(1), Boolean::from(true));}
-        }
+
         tracing::info!("Layout Provider stopped");
     }
 }

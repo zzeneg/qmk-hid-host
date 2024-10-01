@@ -10,5 +10,6 @@ pub enum DataType {
 #[cfg(target_os = "macos")]
 pub enum DataType {
     Time = 0xAA, // random value that does not conflict with VIA/VIAL, must match firmware
-    Layout = 0xAC,
+    Volume,
+    Layout,
 }
