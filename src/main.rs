@@ -66,11 +66,11 @@ fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provid
 }
 
 #[cfg(target_os = "macos")]
-fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>, layouts: Vec<String>) -> Vec<Box<dyn Provider>> {
+fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provider>> {
     return vec![
         TimeProvider::new(data_sender.clone()),
         VolumeProvider::new(data_sender.clone()),
-        LayoutProvider::new(data_sender.clone(), layouts),
+        LayoutProvider::new(data_sender.clone()),
     ];
 }
 

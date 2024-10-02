@@ -174,7 +174,7 @@ pub struct VolumeProvider {
 }
 
 impl VolumeProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>) -> Box<dyn Provider> {
+    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let sender = data_sender.clone();
         let volume_changed_block = RcBlock::new(move |_: u32, _: u64| {
             if let Some(volume) = get_current_volume() {

@@ -77,24 +77,25 @@ impl Provider for LayoutProvider {
         let is_started = self.is_started.clone();
         let mut synced_layout = "".to_string();
 
-        std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
-            loop {
-                if !is_started.load(Relaxed) {
-                    break;
-                }
-
-                if let Some(layout) = get_keyboard_layout() {
-                    let lang = layout.split('.').last().unwrap().to_string();
-                    if synced_layout != lang {
-                        synced_layout = lang;
-                        send_data(&synced_layout, &layouts, &data_sender);
-                    }
-                }
-                std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::spawn(move || loop {
+            if !is_started.load(Relaxed) {
+                break;
             }
+
+            if let Some(layout) = get_keyboard_layout() {
+                let lang = layout.split('.').last().unwrap().to_string();
+                if synced_layout != lang {
+                    synced_layout = lang;
+                    send_data(&synced_layout, &layouts, &data_sender);
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         });
 
         tracing::info!("Layout Provider stopped");
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }
