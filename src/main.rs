@@ -75,7 +75,21 @@ fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provid
 }
 
 #[cfg(not(target_os = "macos"))]
+fn run(data_sender: broadcast::Sender<Vec<u8>>, is_connected_receiver: mpsc::Receiver<bool>) {
+    start(data_sender, is_connected_receiver);
+}
+
+#[cfg(target_os = "macos")]
 fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
+    thread::spawn(move || {
+        start(data_sender, is_connected_receiver);
+    });
+    unsafe {
+        CFRunLoopRun();
+    }
+}
+
+fn start(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
     let providers = get_providers(&data_sender);
 
     let mut connected_count = 0;
@@ -96,35 +110,5 @@ fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc:
                 providers.iter().for_each(|p| p.stop());
             }
         }
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
-    thread::spawn(move || {
-        let providers = get_providers(&data_sender);
-
-        let mut connected_count = 0;
-        let mut is_started = false;
-
-        loop {
-            if let Some(is_connected) = is_connected_receiver.blocking_recv() {
-                connected_count += if is_connected { 1 } else { -1 };
-                tracing::info!("Connected devices: {}", connected_count);
-
-                if connected_count > 0 && !is_started {
-                    tracing::info!("Starting providers");
-                    is_started = true;
-                    providers.iter().for_each(|p| p.start());
-                } else if connected_count == 0 && is_started {
-                    tracing::info!("Stopping providers");
-                    is_started = false;
-                    providers.iter().for_each(|p| p.stop());
-                }
-            }
-        }
-    });
-    unsafe {
-        CFRunLoopRun();
     }
 }
