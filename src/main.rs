@@ -8,67 +8,17 @@ mod data_type;
 mod keyboard;
 mod providers;
 
-use std::thread;
-use tokio::sync::{broadcast, mpsc};
 use config::get_config;
 use keyboard::Keyboard;
-#[cfg(not(target_os = "macos"))]
-use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, media::MediaProvider, volume::VolumeProvider};
-
-
-#[cfg(target_os = "macos")]
-use {
-    providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, volume::VolumeProvider},
-    core_foundation_sys::runloop::CFRunLoopRun,
-};
-
-#[cfg(target_os = "macos")]
-fn run(layouts: Vec<String>, data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) {
-    let mut is_connected = false;
-    let mut connected_receiver = connected_sender.subscribe();
-
-    thread::spawn(move || {
-        let providers: Vec<Box<dyn Provider>> = vec![
-            TimeProvider::new(data_sender.clone(), connected_sender.clone()),
-            LayoutProvider::new(data_sender.clone(), connected_sender.clone(), layouts),
-            VolumeProvider::new(data_sender.clone(), connected_sender.clone()),
-        ];
-
-        loop {
-            if let Ok(connected) = connected_receiver.blocking_recv() {
-                if !is_connected && connected {
-                    providers.iter().for_each(|p| p.start());
-                }
-
-                is_connected = connected;
-            }
-        }
-    });
-    unsafe { CFRunLoopRun(); }
-}
+use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, volume::VolumeProvider};
+use std::thread;
+use tokio::sync::{broadcast, mpsc};
 
 #[cfg(not(target_os = "macos"))]
-fn run(layouts: Vec<String>, data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) {
-    let providers: Vec<Box<dyn Provider>> = vec![
-        TimeProvider::new(data_sender.clone(), connected_sender.clone()),
-        VolumeProvider::new(data_sender.clone(), connected_sender.clone()),
-        LayoutProvider::new(data_sender.clone(), connected_sender.clone(), layouts),
-        MediaProvider::new(data_sender.clone(), connected_sender.clone()),
-    ];
+use providers::media::MediaProvider;
 
-    let mut is_connected = false;
-    let mut connected_receiver = connected_sender.subscribe();
-
-    loop {
-        if let Ok(connected) = connected_receiver.blocking_recv() {
-            if !is_connected && connected {
-                providers.iter().for_each(|p| p.start());
-            }
-
-            is_connected = connected;
-        }
-    }
-}
+#[cfg(target_os = "macos")]
+use core_foundation_sys::runloop::CFRunLoopRun;
 
 use clap::Parser;
 
@@ -89,8 +39,92 @@ fn main() {
     let args = Args::parse();
     let config = get_config(args.config);
 
-    let keyboard = Keyboard::new(config.device, config.reconnect_delay);
-    let (connected_sender, data_sender) = keyboard.connect();
+    let (data_sender, _) = broadcast::channel::<Vec<u8>>(1);
+    let (is_connected_sender, is_connected_receiver) = mpsc::channel::<bool>(1);
 
-    run(config.layouts, data_sender, connected_sender);
+    for device in config.devices {
+        let data_sender = data_sender.clone();
+        let is_connected_sender = is_connected_sender.clone();
+        let reconnect_delay = config.reconnect_delay;
+        thread::spawn(move || {
+            let keyboard = Keyboard::new(device, reconnect_delay);
+            keyboard.connect(data_sender, is_connected_sender);
+        });
+    }
+
+    run(data_sender, is_connected_receiver);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provider>> {
+    return vec![
+        TimeProvider::new(data_sender.clone()),
+        VolumeProvider::new(data_sender.clone()),
+        LayoutProvider::new(data_sender.clone()),
+        MediaProvider::new(data_sender.clone()),
+    ];
+}
+
+#[cfg(target_os = "macos")]
+fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>, layouts: Vec<String>) -> Vec<Box<dyn Provider>> {
+    return vec![
+        TimeProvider::new(data_sender.clone()),
+        VolumeProvider::new(data_sender.clone()),
+        LayoutProvider::new(data_sender.clone(), layouts),
+    ];
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
+    let providers = get_providers(&data_sender);
+
+    let mut connected_count = 0;
+    let mut is_started = false;
+
+    loop {
+        if let Some(is_connected) = is_connected_receiver.blocking_recv() {
+            connected_count += if is_connected { 1 } else { -1 };
+            tracing::info!("Connected devices: {}", connected_count);
+
+            if connected_count > 0 && !is_started {
+                tracing::info!("Starting providers");
+                is_started = true;
+                providers.iter().for_each(|p| p.start());
+            } else if connected_count == 0 && is_started {
+                tracing::info!("Stopping providers");
+                is_started = false;
+                providers.iter().for_each(|p| p.stop());
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
+    thread::spawn(move || {
+        let providers = get_providers(&data_sender);
+
+        let mut connected_count = 0;
+        let mut is_started = false;
+
+        loop {
+            if let Some(is_connected) = is_connected_receiver.blocking_recv() {
+                connected_count += if is_connected { 1 } else { -1 };
+                tracing::info!("Connected devices: {}", connected_count);
+
+                if connected_count > 0 && !is_started {
+                    tracing::info!("Starting providers");
+                    is_started = true;
+                    providers.iter().for_each(|p| p.start());
+                } else if connected_count == 0 && is_started {
+                    tracing::info!("Stopping providers");
+                    is_started = false;
+                    providers.iter().for_each(|p| p.stop());
+                }
+            }
+        }
+    });
+    unsafe {
+        CFRunLoopRun();
+    }
 }

@@ -1,8 +1,9 @@
-use std::ops::Deref;
-
 use libpulse_binding::context::subscribe::Facility;
 use pulsectl::controllers::{DeviceControl, SinkController};
-use tokio::sync::{broadcast, mpsc};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 use crate::data_type::DataType;
 
@@ -19,22 +20,22 @@ fn get_volume() -> Option<f32> {
     return None;
 }
 
-fn send_data(value: &f32, push_sender: &mpsc::Sender<Vec<u8>>) {
+fn send_data(value: &f32, push_sender: &broadcast::Sender<Vec<u8>>) {
     let volume = (value * 100.0).round() as u8;
     let data = vec![DataType::Volume as u8, volume];
-    push_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+    push_sender.send(data).unwrap();
 }
 
 pub struct VolumeProvider {
-    data_sender: mpsc::Sender<Vec<u8>>,
-    connected_sender: broadcast::Sender<bool>,
+    data_sender: broadcast::Sender<Vec<u8>>,
+    is_started: Arc<AtomicBool>,
 }
 
 impl VolumeProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
+    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = VolumeProvider {
             data_sender,
-            connected_sender,
+            is_started: Arc::new(AtomicBool::new(false)),
         };
         return Box::new(provider);
     }
@@ -43,15 +44,14 @@ impl VolumeProvider {
 impl Provider for VolumeProvider {
     fn start(&self) {
         tracing::info!("Volume Provider started");
+        self.is_started.store(true, Relaxed);
         let data_sender = self.data_sender.clone();
-        let connected_sender = self.connected_sender.clone();
+        let is_started = self.is_started.clone();
 
         let mut volume = get_volume().unwrap_or_default();
         send_data(&volume, &self.data_sender);
 
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
-
             let controller = SinkController::create().map_err(|e| tracing::error!("{}", e)).unwrap();
             let mut ctx = controller.handler.context.deref().borrow_mut();
 
@@ -66,7 +66,7 @@ impl Provider for VolumeProvider {
             ctx.subscribe(Facility::Sink.to_interest_mask(), |_| {});
 
             loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
+                if !is_started.load(Relaxed) {
                     break;
                 }
 
@@ -75,5 +75,9 @@ impl Provider for VolumeProvider {
 
             tracing::info!("Volume Provider stopped");
         });
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }

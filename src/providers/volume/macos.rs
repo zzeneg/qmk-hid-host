@@ -1,13 +1,18 @@
-use crate::providers::_base::Provider;
 use block2::{Block, RcBlock};
 use coreaudio::audio_unit::macos_helpers::get_default_device_id;
-use coreaudio_sys::{dispatch_queue_t, kAudioDevicePropertyScopeOutput, kAudioDevicePropertyVolumeScalar, kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, AudioObjectGetPropertyData, AudioObjectID, AudioObjectIsPropertySettable, AudioObjectPropertyAddress, OSStatus};
+use coreaudio_sys::{
+    dispatch_queue_t, kAudioDevicePropertyScopeOutput, kAudioDevicePropertyVolumeScalar, kAudioHardwarePropertyDefaultOutputDevice,
+    kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject,
+    AudioObjectGetPropertyData, AudioObjectID, AudioObjectIsPropertySettable, AudioObjectPropertyAddress, OSStatus,
+};
 use std::option::Option;
 use std::ptr;
-use tokio::sync::{broadcast, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 use crate::data_type::DataType;
-
+use crate::providers::_base::Provider;
 
 extern "C" {
     pub fn AudioObjectAddPropertyListenerBlock(
@@ -68,13 +73,7 @@ fn is_volume_control_supported(device_id: AudioObjectID, channel: u32) -> bool {
         mElement: channel,
     };
 
-    let status = unsafe {
-        AudioObjectIsPropertySettable(
-            device_id,
-            &property_address,
-            &mut is_writable,
-        )
-    };
+    let status = unsafe { AudioObjectIsPropertySettable(device_id, &property_address, &mut is_writable) };
 
     status == 0 && is_writable != 0
 }
@@ -104,30 +103,38 @@ fn register_volume_listener(listener: &RcBlock<dyn Fn(u32, u64)>) {
         mElement: channel.unwrap(),
     };
 
-    let listener_status = unsafe { AudioObjectRemovePropertyListenerBlock(device_id.unwrap(), &property_address, ptr::null_mut(), &listener)};
+    let listener_status =
+        unsafe { AudioObjectRemovePropertyListenerBlock(device_id.unwrap(), &property_address, ptr::null_mut(), &listener) };
     if listener_status == 0 {
         tracing::info!(
             "Volume listener successfully removed for channel {} of device {}",
-            channel.unwrap(), device_id.unwrap()
+            channel.unwrap(),
+            device_id.unwrap()
         );
     } else {
-        tracing::info!("Failed to remove volume listener for channel {} of device {}", channel.unwrap(), device_id.unwrap())
+        tracing::info!(
+            "Failed to remove volume listener for channel {} of device {}",
+            channel.unwrap(),
+            device_id.unwrap()
+        )
     }
 
-    let listener_status = unsafe {
-        AudioObjectAddPropertyListenerBlock(device_id.unwrap(), &property_address, ptr::null_mut(), &listener)
-    };
+    let listener_status = unsafe { AudioObjectAddPropertyListenerBlock(device_id.unwrap(), &property_address, ptr::null_mut(), &listener) };
 
     if listener_status == 0 {
         tracing::info!(
             "Volume listener successfully registered for channel {} of device {}",
-            channel.unwrap(), device_id.unwrap()
+            channel.unwrap(),
+            device_id.unwrap()
         );
     } else {
-        tracing::info!("Failed to register volume listener for channel {} of device {}", channel.unwrap(), device_id.unwrap())
+        tracing::info!(
+            "Failed to register volume listener for channel {} of device {}",
+            channel.unwrap(),
+            device_id.unwrap()
+        )
     }
 }
-
 
 fn register_device_change_listener(listener: &RcBlock<dyn Fn(u32, u64)>) {
     let property_address = AudioObjectPropertyAddress {
@@ -136,18 +143,16 @@ fn register_device_change_listener(listener: &RcBlock<dyn Fn(u32, u64)>) {
         mElement: kAudioObjectPropertyElementMain,
     };
 
-    let listener_status = unsafe {
-        AudioObjectRemovePropertyListenerBlock(kAudioObjectSystemObject, &property_address, ptr::null_mut(), &listener)
-    };
+    let listener_status =
+        unsafe { AudioObjectRemovePropertyListenerBlock(kAudioObjectSystemObject, &property_address, ptr::null_mut(), &listener) };
     if listener_status == 0 {
         tracing::info!("Default device change listener successfully removed");
     } else {
         tracing::info!("Failed to remove default device change listener");
     }
 
-    let listener_status = unsafe {
-        AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &property_address, ptr::null_mut(), &listener)
-    };
+    let listener_status =
+        unsafe { AudioObjectAddPropertyListenerBlock(kAudioObjectSystemObject, &property_address, ptr::null_mut(), &listener) };
 
     if listener_status == 0 {
         tracing::info!("Default device change listener registered successfully");
@@ -156,60 +161,57 @@ fn register_device_change_listener(listener: &RcBlock<dyn Fn(u32, u64)>) {
     }
 }
 
-fn send_data(value: &f32, push_sender: &mpsc::Sender<Vec<u8>>) {
+fn send_data(value: &f32, push_sender: &broadcast::Sender<Vec<u8>>) {
     let volume = (value * 100.0).round() as u8;
     let data = vec![DataType::Volume as u8, volume];
-    push_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+    push_sender.send(data).unwrap();
 }
 
 pub struct VolumeProvider {
-    connected_sender: broadcast::Sender<bool>,
+    is_started: Arc<AtomicBool>,
     device_changed_block: RcBlock<dyn Fn(u32, u64)>,
     volume_changed_block: RcBlock<dyn Fn(u32, u64)>,
 }
 
 impl VolumeProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
+    pub fn new(data_sender: mpsc::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let sender = data_sender.clone();
-        let volume_changed_block = RcBlock::new(move |_: u32, _: u64|{
-            if let Some(volume) = get_current_volume(){
+        let volume_changed_block = RcBlock::new(move |_: u32, _: u64| {
+            if let Some(volume) = get_current_volume() {
                 send_data(&volume, &sender.clone());
             }
         });
 
         let sender = data_sender.clone();
         let volume_changed_block_clone = volume_changed_block.clone();
-        let device_changed_block: RcBlock<dyn Fn(u32, u64)> = RcBlock::new(move |_: u32, _: u64|{
+        let device_changed_block: RcBlock<dyn Fn(u32, u64)> = RcBlock::new(move |_: u32, _: u64| {
             register_volume_listener(&volume_changed_block_clone);
-            if let Some(volume) = get_current_volume(){
+            if let Some(volume) = get_current_volume() {
                 send_data(&volume, &sender.clone());
             }
         });
 
         let provider = VolumeProvider {
-            connected_sender,
+            is_started: Arc::new(AtomicBool::new(false)),
             device_changed_block,
             volume_changed_block,
         };
         Box::new(provider)
     }
-
 }
 
 impl Provider for VolumeProvider {
-
     fn start(&self) {
         tracing::info!("Volume Provider started");
-        let connected_sender = self.connected_sender.clone();
+        self.is_started.store(true, Relaxed);
+        let is_started = self.is_started.clone();
 
         register_volume_listener(&self.volume_changed_block);
         register_device_change_listener(&self.device_changed_block);
 
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
-
             loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
+                if !is_started.load(Relaxed) {
                     break;
                 }
 
@@ -218,5 +220,9 @@ impl Provider for VolumeProvider {
 
             tracing::info!("Volume Provider stopped");
         });
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }

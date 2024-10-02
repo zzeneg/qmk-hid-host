@@ -1,5 +1,7 @@
 use chrono::{DateTime, Local, Timelike};
-use tokio::sync::{broadcast, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 use crate::data_type::DataType;
 
@@ -12,21 +14,21 @@ fn get_time() -> (u8, u8) {
     return (hour, minute);
 }
 
-fn send_data(value: &(u8, u8), push_sender: &mpsc::Sender<Vec<u8>>) {
+fn send_data(value: &(u8, u8), push_sender: &broadcast::Sender<Vec<u8>>) {
     let data = vec![DataType::Time as u8, value.0, value.1];
-    push_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+    push_sender.send(data).unwrap();
 }
 
 pub struct TimeProvider {
-    data_sender: mpsc::Sender<Vec<u8>>,
-    connected_sender: broadcast::Sender<bool>,
+    data_sender: broadcast::Sender<Vec<u8>>,
+    is_started: Arc<AtomicBool>,
 }
 
 impl TimeProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>) -> Box<dyn Provider> {
+    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = TimeProvider {
             data_sender,
-            connected_sender,
+            is_started: Arc::new(AtomicBool::new(false)),
         };
         return Box::new(provider);
     }
@@ -34,14 +36,14 @@ impl TimeProvider {
 
 impl Provider for TimeProvider {
     fn start(&self) {
-        tracing::info!("Time Provider enabled");
+        tracing::info!("Time Provider started");
+        self.is_started.store(true, Relaxed);
         let data_sender = self.data_sender.clone();
-        let connected_sender = self.connected_sender.clone();
+        let is_started = self.is_started.clone();
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
             let mut synced_time = (0u8, 0u8);
             loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
+                if !is_started.load(Relaxed) {
                     break;
                 }
 
@@ -56,5 +58,9 @@ impl Provider for TimeProvider {
 
             tracing::info!("Time Provider stopped");
         });
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }
