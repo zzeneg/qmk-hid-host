@@ -70,13 +70,24 @@ fn run(layouts: Vec<String>, data_sender: mpsc::Sender<Vec<u8>>, connected_sende
     }
 }
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// Path to the configuration file
+    #[arg(short, long)]
+    config: Option<std::path::PathBuf>,
+}
+
 fn main() {
     let env_filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
         .from_env_lossy();
     let tracing_subscriber = tracing_subscriber::fmt().with_env_filter(env_filter).finish();
     let _ = tracing::subscriber::set_global_default(tracing_subscriber);
-    let config = get_config();
+
+    let args = Args::parse();
+    let config = get_config(args.config);
 
     let keyboard = Keyboard::new(config.device, config.reconnect_delay);
     let (connected_sender, data_sender) = keyboard.connect();
