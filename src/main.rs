@@ -45,7 +45,7 @@ fn main() {
     for device in config.devices {
         let data_sender = data_sender.clone();
         let is_connected_sender = is_connected_sender.clone();
-        let reconnect_delay = config.reconnect_delay;
+        let reconnect_delay = config.reconnect_delay.unwrap_or(5000);
         thread::spawn(move || {
             let keyboard = Keyboard::new(device, reconnect_delay);
             keyboard.connect(data_sender, is_connected_sender);
