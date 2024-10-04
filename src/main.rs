@@ -8,7 +8,7 @@ mod data_type;
 mod keyboard;
 mod providers;
 
-use config::get_config;
+use config::load_config;
 use keyboard::Keyboard;
 use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, volume::VolumeProvider};
 use std::thread;
@@ -37,12 +37,12 @@ fn main() {
     let _ = tracing::subscriber::set_global_default(tracing_subscriber);
 
     let args = Args::parse();
-    let config = get_config(args.config);
+    let config = load_config(args.config.unwrap_or("./qmk-hid-host.json".into()));
 
     let (data_sender, _) = broadcast::channel::<Vec<u8>>(1);
     let (is_connected_sender, is_connected_receiver) = mpsc::channel::<bool>(1);
 
-    for device in config.devices {
+    for device in &config.devices {
         let data_sender = data_sender.clone();
         let is_connected_sender = is_connected_sender.clone();
         let reconnect_delay = config.reconnect_delay.unwrap_or(5000);

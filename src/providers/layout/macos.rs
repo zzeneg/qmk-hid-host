@@ -53,7 +53,6 @@ fn send_data(value: &String, layouts: &Vec<String>, data_sender: &broadcast::Sen
 
 pub struct LayoutProvider {
     data_sender: broadcast::Sender<Vec<u8>>,
-    layouts: Vec<String>,
     is_started: Arc<AtomicBool>,
 }
 
@@ -61,7 +60,6 @@ impl LayoutProvider {
     pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = LayoutProvider {
             data_sender,
-            layouts: get_config().layouts,
             is_started: Arc::new(AtomicBool::new(false)),
         };
         Box::new(provider)
@@ -72,8 +70,8 @@ impl Provider for LayoutProvider {
     fn start(&self) {
         tracing::info!("Layout Provider started");
         self.is_started.store(true, Relaxed);
+        let layouts = &get_config().layouts;
         let data_sender = self.data_sender.clone();
-        let layouts = self.layouts.clone();
         let is_started = self.is_started.clone();
         let mut synced_layout = "".to_string();
 
@@ -86,7 +84,7 @@ impl Provider for LayoutProvider {
                 let lang = layout.split('.').last().unwrap().to_string();
                 if synced_layout != lang {
                     synced_layout = lang;
-                    send_data(&synced_layout, &layouts, &data_sender);
+                    send_data(&synced_layout, layouts, &data_sender);
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(100));

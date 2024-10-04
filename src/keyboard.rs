@@ -12,9 +12,9 @@ pub struct Keyboard {
 }
 
 impl Keyboard {
-    pub fn new(device: Device, reconnect_delay: u64) -> Self {
+    pub fn new(device: &Device, reconnect_delay: u64) -> Self {
         return Self {
-            name: device.name.unwrap_or("keyboard".to_string()),
+            name: device.name.clone().unwrap_or("keyboard".to_string()),
             product_id: device.product_id,
             usage: device.usage.unwrap_or(0x61),
             usage_page: device.usage_page.unwrap_or(0xff60),
