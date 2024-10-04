@@ -1,8 +1,11 @@
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
 use std::{ffi, mem, ptr};
-
-use crate::data_type::DataType;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 use x11::xlib::{XGetAtomName, XOpenDisplay, XkbAllocKeyboard, XkbGetNames, XkbGetState, _XDisplay, _XkbDesc, _XkbStateRec};
+
+use crate::config::get_config;
+use crate::data_type::DataType;
 
 use super::super::_base::Provider;
 
@@ -24,27 +27,25 @@ fn get_layout_index(display: *mut _XDisplay) -> usize {
     return state.group as usize;
 }
 
-fn send_data(value: &String, layouts: &Vec<String>, data_sender: &mpsc::Sender<Vec<u8>>) {
+fn send_data(value: &String, layouts: &Vec<String>, data_sender: &broadcast::Sender<Vec<u8>>) {
     tracing::info!("new layout: '{0}', layout list: {1:?}", value, layouts);
     let index = layouts.into_iter().position(|r| r == value);
     if let Some(index) = index {
         let data = vec![DataType::Layout as u8, index as u8];
-        data_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+        data_sender.send(data).unwrap();
     }
 }
 
 pub struct LayoutProvider {
-    data_sender: mpsc::Sender<Vec<u8>>,
-    connected_sender: broadcast::Sender<bool>,
-    layouts: Vec<String>,
+    data_sender: broadcast::Sender<Vec<u8>>,
+    is_started: Arc<AtomicBool>,
 }
 
 impl LayoutProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>, layouts: Vec<String>) -> Box<dyn Provider> {
+    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = LayoutProvider {
             data_sender,
-            connected_sender,
-            layouts,
+            is_started: Arc::new(AtomicBool::new(false)),
         };
         return Box::new(provider);
     }
@@ -53,13 +54,11 @@ impl LayoutProvider {
 impl Provider for LayoutProvider {
     fn start(&self) {
         tracing::info!("Layout Provider started");
-
+        self.is_started.store(true, Relaxed);
+        let layouts = &get_config().layouts;
         let data_sender = self.data_sender.clone();
-        let connected_sender = self.connected_sender.clone();
-        let layouts = self.layouts.clone();
-
+        let is_started = self.is_started.clone();
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
             let mut synced_layout = 0;
             let display = unsafe { XOpenDisplay(ptr::null()) };
             let keyboard = unsafe { XkbAllocKeyboard() };
@@ -67,7 +66,7 @@ impl Provider for LayoutProvider {
             let symbol_list = symbols.split('+').map(|x| x.to_string()).collect::<Vec<String>>();
 
             loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
+                if !is_started.load(Relaxed) {
                     break;
                 }
 
@@ -76,7 +75,7 @@ impl Provider for LayoutProvider {
                     synced_layout = layout;
                     let layout_symbol = symbol_list.get(layout + 1).map(|x| x.to_string()).unwrap_or_default();
                     let layout_name = layout_symbol.split([':', '(']).next().unwrap_or_default().to_string();
-                    send_data(&layout_name, &layouts, &data_sender);
+                    send_data(&layout_name, layouts, &data_sender);
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(100));
@@ -84,5 +83,9 @@ impl Provider for LayoutProvider {
 
             tracing::info!("Layout Provider stopped");
         });
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }

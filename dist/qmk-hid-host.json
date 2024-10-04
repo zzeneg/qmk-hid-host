@@ -1,9 +1,9 @@
 {
-  "device": {
-    "productId": 2116,
-    "usage": 97,
-    "usagePage": 65376
-  },
-  "layouts": ["en"],
-  "reconnectDelay": 5000
+  "devices": [
+    {
+      "name": "stront",
+      "productId": "0x0844"
+    }
+  ],
+  "layouts": ["en"]
 }

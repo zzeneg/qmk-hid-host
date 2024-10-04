@@ -1,4 +1,6 @@
-use tokio::sync::{broadcast, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 use windows::Win32::{
     Globalization::{GetLocaleInfoW, LOCALE_SISO639LANGNAME},
     UI::{
@@ -8,6 +10,7 @@ use windows::Win32::{
     },
 };
 
+use crate::config::get_config;
 use crate::data_type::DataType;
 
 use super::super::_base::Provider;
@@ -26,25 +29,23 @@ unsafe fn get_layout() -> Option<String> {
     None
 }
 
-fn send_data(value: &String, layouts: &Vec<String>, data_sender: &mpsc::Sender<Vec<u8>>) {
+fn send_data(value: &String, layouts: &Vec<String>, data_sender: &broadcast::Sender<Vec<u8>>) {
     if let Some(index) = layouts.into_iter().position(|r| r == value) {
         let data = vec![DataType::Layout as u8, index as u8];
-        data_sender.try_send(data).unwrap_or_else(|e| tracing::error!("{}", e));
+        data_sender.send(data).unwrap();
     }
 }
 
 pub struct LayoutProvider {
-    data_sender: mpsc::Sender<Vec<u8>>,
-    connected_sender: broadcast::Sender<bool>,
-    layouts: Vec<String>,
+    data_sender: broadcast::Sender<Vec<u8>>,
+    is_started: Arc<AtomicBool>,
 }
 
 impl LayoutProvider {
-    pub fn new(data_sender: mpsc::Sender<Vec<u8>>, connected_sender: broadcast::Sender<bool>, layouts: Vec<String>) -> Box<dyn Provider> {
+    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = LayoutProvider {
             data_sender,
-            connected_sender,
-            layouts,
+            is_started: Arc::new(AtomicBool::new(false)),
         };
         return Box::new(provider);
     }
@@ -53,21 +54,21 @@ impl LayoutProvider {
 impl Provider for LayoutProvider {
     fn start(&self) {
         tracing::info!("Layout Provider started");
+        self.is_started.store(true, Relaxed);
+        let layouts = &get_config().layouts;
         let data_sender = self.data_sender.clone();
-        let connected_sender = self.connected_sender.clone();
-        let layouts = self.layouts.clone();
+        let is_started = self.is_started.clone();
         std::thread::spawn(move || {
-            let mut connected_receiver = connected_sender.subscribe();
             let mut synced_layout = "".to_string();
             loop {
-                if !connected_receiver.try_recv().unwrap_or(true) {
+                if !is_started.load(Relaxed) {
                     break;
                 }
 
                 if let Some(layout) = unsafe { get_layout() } {
                     if synced_layout != layout {
                         synced_layout = layout;
-                        send_data(&synced_layout, &layouts, &data_sender);
+                        send_data(&synced_layout, layouts, &data_sender);
                     }
                 }
 
@@ -76,5 +77,9 @@ impl Provider for LayoutProvider {
 
             tracing::info!("Layout Provider stopped");
         });
+    }
+
+    fn stop(&self) {
+        self.is_started.store(false, Relaxed);
     }
 }

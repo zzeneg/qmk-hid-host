@@ -10,8 +10,8 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## Supported platforms/providers
 
-|              | Windows            | Linux                           | macos              |
-| ------------ | ------------------ | ------------------------------- |--------------------|
+|              | Windows            | Linux                           | MacOS              |
+| ------------ | ------------------ | ------------------------------- | ------------------ |
 | Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
 | Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: |
 | Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
@@ -27,11 +27,25 @@ All files are available in [latest release](https://github.com/zzeneg/qmk-hid-ho
 
 Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify the configuration file (`qmk-hid-host.json`).
 
-- `device` section contains information about keyboard. All values are **decimal**, make sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
+- `devices` section contains a list of keyboards
   - `productId` - `pid` from your keyboard's `info.json`
-  - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
+  - `name` - keyboard's name (optional, visible only in logs)
+  - `usage` and `usagePage` - optional, override only if `RAW_USAGE_ID` and `RAW_USAGE_PAGE` were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format (app sends layout's index, not name)
-- `reconnectDelay` - delay between reconnecting attempts in milliseconds
+- `reconnectDelay` - delay between reconnecting attempts in milliseconds (optional, default is 5000)
+
+#### Minimal config
+
+```json
+{
+  "devices": [
+    {
+      "productId": "0x0844"
+    }
+  ],
+  "layouts": ["en"]
+}
+```
 
 Configuration is read from file `qmk-hid-host.json` in the current working directory. If it is not found, then the default configuration is written to this file. 
 You can specify a different location for the configuration file by using `--config (-c)` command line option. For example:
@@ -65,20 +79,24 @@ When you verified that the application works with your keyboard, you can use `qm
 3. Start `qmk-hid-host`, add it to autorun if needed
 
 ### MacOS
+
 1. Download `qmk-hid-host`
 2. Modify `qmk-hid-host.json`
 3. Add your layouts, for example:
-```
-"layouts": [
-      "ABC", "Russian"
-],
-```
-if you don't know what layout are installed in you system, run qmk-hid-host with the layouts listed above, change lang and look at terminal output:
-```
-INFO qmk_hid_host::providers::layout::macos: new layout: 'ABC', layout list: ["ABC", "Russian"]
-INFO qmk_hid_host::providers::layout::macos: new layout: 'Russian', layout list: ["ABC", "Russian"]
-```
-"new layout:" is what you need
+
+   ```json
+   "layouts": ["ABC", "Russian"],
+   ```
+
+   if you don't know what layout are installed in you system, run qmk-hid-host with the layouts listed above, change lang and look at terminal output:
+
+   ```
+   INFO qmk_hid_host::providers::layout::macos: new layout: 'ABC', layout list: ["ABC", "Russian"]
+   INFO qmk_hid_host::providers::layout::macos: new layout: 'Russian', layout list: ["ABC", "Russian"]
+   ```
+
+   "new layout:" is what you need
+
 4. start `qmk-hid-host` from directory where your `qmk-hid-host.json` is located
 5. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
    1. You're wrong with productId in your config
@@ -91,6 +109,9 @@ INFO qmk_hid_host::providers::layout::macos: new layout: 'Russian', layout list:
 3. If needed, edit `qmk-hid-host.json` in root folder and run again
 
 ## Changelog
+
+- 2024-10-03 - add support for multiple devices, restructure config
+- 2024-09-15 - add MacOS support
 - 2024-02-06 - add Linux support
 - 2024-01-21 - remove run as windows service, add silent version instead
 - 2024-01-02 - support RUST_LOG, run as windows service
