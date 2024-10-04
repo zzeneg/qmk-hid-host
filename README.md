@@ -25,13 +25,20 @@ All files are available in [latest release](https://github.com/zzeneg/qmk-hid-ho
 
 ### Configuration
 
-Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify `qmk-hid-host.json`.
+Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify the configuration file (`qmk-hid-host.json`).
 
 - `device` section contains information about keyboard. All values are **decimal**, make sure to convert them from hex using a [converter](https://tools.keycdn.com/hex-converter).
   - `productId` - `pid` from your keyboard's `info.json`
   - `usage` and `usagePage` - default values from QMK (`RAW_USAGE_ID` and `RAW_USAGE_PAGE`). No need to modify them unless they were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format (app sends layout's index, not name)
 - `reconnectDelay` - delay between reconnecting attempts in milliseconds
+
+Configuration is read from file `qmk-hid-host.json` in the current working directory. If it is not found, then the default configuration is written to this file. 
+You can specify a different location for the configuration file by using `--config (-c)` command line option. For example:
+
+```
+qmk-hid-host -c $HOME/.config/qmk-hid-host/config.json
+```
 
 ### Windows
 
