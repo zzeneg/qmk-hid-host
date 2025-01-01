@@ -10,12 +10,9 @@ mod providers;
 
 use config::load_config;
 use keyboard::Keyboard;
-use providers::{_base::Provider, layout::LayoutProvider, time::TimeProvider, volume::VolumeProvider};
+use providers::{_base::Provider, layout::LayoutProvider, media::MediaProvider, time::TimeProvider, volume::VolumeProvider};
 use std::thread;
 use tokio::sync::{broadcast, mpsc};
-
-#[cfg(not(target_os = "macos"))]
-use providers::media::MediaProvider;
 
 #[cfg(target_os = "macos")]
 use core_foundation_sys::runloop::CFRunLoopRun;
@@ -55,7 +52,6 @@ fn main() {
     run(data_sender, is_connected_receiver);
 }
 
-#[cfg(not(target_os = "macos"))]
 fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provider>> {
     return vec![
         TimeProvider::new(data_sender.clone()),
@@ -65,22 +61,13 @@ fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provid
     ];
 }
 
-#[cfg(target_os = "macos")]
-fn get_providers(data_sender: &broadcast::Sender<Vec<u8>>) -> Vec<Box<dyn Provider>> {
-    return vec![
-        TimeProvider::new(data_sender.clone()),
-        VolumeProvider::new(data_sender.clone()),
-        LayoutProvider::new(data_sender.clone()),
-    ];
-}
-
 #[cfg(not(target_os = "macos"))]
 fn run(data_sender: broadcast::Sender<Vec<u8>>, is_connected_receiver: mpsc::Receiver<bool>) {
     start(data_sender, is_connected_receiver);
 }
 
 #[cfg(target_os = "macos")]
-fn run(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mpsc::Receiver<bool>) {
+fn run(data_sender: broadcast::Sender<Vec<u8>>, is_connected_receiver: mpsc::Receiver<bool>) {
     thread::spawn(move || {
         start(data_sender, is_connected_receiver);
     });

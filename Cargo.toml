@@ -12,7 +12,7 @@ silent = []
 
 [dependencies]
 tracing = "0.1"
-tracing-subscriber = { version="0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = "0.4.26"
 hidapi = "2.4.0"
 tokio = { version = "1.29.1", features = ["full"] }
@@ -20,6 +20,7 @@ async-std = "1.7.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.0.0", features = ["derive"] }
+apple-music = "0.11.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pulsectl-rs = "0.3.2"
@@ -31,11 +32,12 @@ mpris = "2.0.1"
 core-foundation = "0.10"
 core-foundation-sys = "0.8.7"
 libc = "0.2"
-objc2 = {version = "0.5.2", features = ["default"]}
+objc2 = { version = "0.5.2", features = ["default"] }
 objc2-foundation = { version = "0.2.2", features = ["all"] }
 block2 = "0.5.1"
 coreaudio-sys = "0.2.16"
 coreaudio-rs = "0.12.1"
+core-media = "0.5.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 [dependencies.windows]
