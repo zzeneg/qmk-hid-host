@@ -100,14 +100,18 @@ fn start(data_sender: broadcast::Sender<Vec<u8>>, mut is_connected_receiver: mps
             connected_count += if is_connected { 1 } else { -1 };
             tracing::info!("Connected devices: {}", connected_count);
 
-            if connected_count > 0 && !is_started {
-                tracing::info!("Starting providers");
-                is_started = true;
-                providers.iter().for_each(|p| p.start());
-            } else if connected_count == 0 && is_started {
+            // if new device is connected - restart providers to send all available data
+            if is_started && (connected_count == 0 || is_connected) {
                 tracing::info!("Stopping providers");
                 is_started = false;
                 providers.iter().for_each(|p| p.stop());
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+
+            if !is_started && connected_count > 0 {
+                tracing::info!("Starting providers");
+                is_started = true;
+                providers.iter().for_each(|p| p.start());
             }
         }
     }

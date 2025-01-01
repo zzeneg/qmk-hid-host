@@ -53,7 +53,7 @@ impl Provider for TimeProvider {
                     send_data(&synced_time, &data_sender);
                 }
 
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
 
             tracing::info!("Time Provider stopped");
