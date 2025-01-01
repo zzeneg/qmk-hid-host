@@ -74,7 +74,12 @@ fn send_data(data_type: DataType, value: &String, data_sender: &broadcast::Sende
     data.truncate(30);
     data.insert(0, data.len() as u8);
     data.insert(0, data_type as u8);
-    data_sender.send(data).unwrap();
+    if let Err(e) = data_sender.send(data) {
+        tracing::error!("Can not send data: {}", e);
+    }
+
+    // short delay to separate title/artist data
+    std::thread::sleep(std::time::Duration::from_millis(10));
 }
 
 pub struct MediaProvider {
