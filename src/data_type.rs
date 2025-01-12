@@ -16,6 +16,6 @@ pub enum DataType {
     Volume,
     Layout,
 
-    RelaySend = 0xCC,
-    RelayReceive,
+    RelayFromDevice = 0xCC,
+    RelayToDevice,
 }
