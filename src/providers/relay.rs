@@ -39,7 +39,9 @@ impl Provider for RelayProvider {
                 tracing::debug!("Relay Provider: waiting for data...");
                 if let Ok(mut data) = relay_subscriber.blocking_recv() {
                     data[0] = DataType::RelayToDevice as u8;
-                    host_to_device_sender.send(data).unwrap();
+                    if let Err(e) = host_to_device_sender.send(data) {
+                        tracing::error!("Relay Provider failed to send data: {:?}", e);
+                    }
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(100));

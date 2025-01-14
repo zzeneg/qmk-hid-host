@@ -14,20 +14,22 @@ fn get_time() -> (u8, u8) {
     return (hour, minute);
 }
 
-fn send_data(value: &(u8, u8), push_sender: &broadcast::Sender<Vec<u8>>) {
+fn send_data(value: &(u8, u8), host_to_device_sender: &broadcast::Sender<Vec<u8>>) {
     let data = vec![DataType::Time as u8, value.0, value.1];
-    push_sender.send(data).unwrap();
+    if let Err(e) = host_to_device_sender.send(data) {
+        tracing::error!("Time Provider failed to send data: {:?}", e);
+    }
 }
 
 pub struct TimeProvider {
-    data_sender: broadcast::Sender<Vec<u8>>,
+    host_to_device_sender: broadcast::Sender<Vec<u8>>,
     is_started: Arc<AtomicBool>,
 }
 
 impl TimeProvider {
-    pub fn new(data_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
+    pub fn new(host_to_device_sender: broadcast::Sender<Vec<u8>>) -> Box<dyn Provider> {
         let provider = TimeProvider {
-            data_sender,
+            host_to_device_sender,
             is_started: Arc::new(AtomicBool::new(false)),
         };
         return Box::new(provider);
@@ -38,7 +40,7 @@ impl Provider for TimeProvider {
     fn start(&self) {
         tracing::info!("Time Provider started");
         self.is_started.store(true, Relaxed);
-        let data_sender = self.data_sender.clone();
+        let host_to_device_sender = self.host_to_device_sender.clone();
         let is_started = self.is_started.clone();
         std::thread::spawn(move || {
             let mut synced_time = (0u8, 0u8);
@@ -50,7 +52,7 @@ impl Provider for TimeProvider {
                 let time = get_time();
                 if synced_time != time {
                     synced_time = time;
-                    send_data(&synced_time, &data_sender);
+                    send_data(&synced_time, &host_to_device_sender);
                 }
 
                 std::thread::sleep(std::time::Duration::from_millis(100));
