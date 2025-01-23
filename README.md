@@ -16,8 +16,67 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 | Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: |
 | Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
 | Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |                    |
+| Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
 
 MacOS is partially supported, as I don't own any Apple devices, feel free to raise PRs.
+
+## Relay mode (device-to-device communication) - experimental
+
+This allows for communication between two or more devices. `qmk-hid-host` only receives information from any device and broadcasts it to all devices. The actual sending and receiving should be configured in devices' firmware, but you have to set first byte in the data array - `0xCC` for sending and `0xCD` for receiving.
+
+Example for syncing layers between two devices:
+
+### Data type enum (common between `qmk-hid-host` and all devices)
+
+```c
+typedef enum {
+    _TIME = 0xAA, // random value that does not conflict with VIA, must match companion app
+    _VOLUME,
+    _LAYOUT,
+    _MEDIA_ARTIST,
+    _MEDIA_TITLE,
+
+    _RELAY_FROM_DEVICE = 0xCC,
+    _RELAY_TO_DEVICE,
+} hid_data_type;
+```
+
+### Source device
+
+```c
+typedef enum {
+    _LAYER = 0,
+} relay_data_type;
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    uint8_t data[32];
+    memset(data, 0, 32);
+    data[0] = _RELAY_FROM_DEVICE;
+    data[1] = _LAYER;
+    data[2] = get_highest_layer(state);
+    raw_hid_send(data, 32);
+
+    return state;
+}
+```
+
+#### Destination device
+
+```c
+typedef enum {
+    _LAYER = 0,
+} relay_data_type;
+
+void raw_hid_receive_kb(uint8_t *data, uint8_t length) {
+    if (data[0] == _RELAY_TO_DEVICE) {
+        switch (data[1]) {
+            case _LAYER:
+                layer_move(data[2]);
+                break;
+        }
+    }
+}
+```
 
 ## How to run it
 
@@ -47,7 +106,7 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
 }
 ```
 
-Configuration is read from file `qmk-hid-host.json` in the current working directory. If it is not found, then the default configuration is written to this file. 
+Configuration is read from file `qmk-hid-host.json` in the current working directory. If it is not found, then the default configuration is written to this file.
 You can specify a different location for the configuration file by using `--config (-c)` command line option. For example:
 
 ```
