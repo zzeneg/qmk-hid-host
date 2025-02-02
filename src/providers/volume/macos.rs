@@ -164,7 +164,9 @@ fn register_device_change_listener(listener: &RcBlock<dyn Fn(u32, u64)>) {
 fn send_data(value: &f32, push_sender: &broadcast::Sender<Vec<u8>>) {
     let volume = (value * 100.0).round() as u8;
     let data = vec![DataType::Volume as u8, volume];
-    push_sender.send(data).unwrap();
+    if let Err(e) = push_sender.send(data) {
+        tracing::error!("Failed to send volume data: {}", e);
+    }
 }
 
 pub struct VolumeProvider {
