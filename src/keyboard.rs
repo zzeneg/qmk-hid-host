@@ -59,6 +59,7 @@ impl Keyboard {
 
                 let hid_api = HidApi::new().unwrap();
                 if let Some(device_info) = Self::get_device_info(&hid_api, &pid, &usage, &usage_page) {
+                    let reconnect_timeout = 1000;
                     loop {
                         match device_info.open_device(&hid_api) {
                             Ok(device) => {
@@ -67,7 +68,9 @@ impl Keyboard {
                             }
                             Err(err) => tracing::error!("{}", err)
                         }
-
+                        std::thread::sleep(std::time::Duration::from_millis(reconnect_timeout));
+                    }
+                    loop {
                         match device_info.open_device(&hid_api) {
                             Ok(device) => {
                                 start_read(&name, device, &is_connected, &device_to_host_sender);
@@ -76,7 +79,7 @@ impl Keyboard {
                             Err(err) => tracing::error!("{}", err)
                         }
 
-                        std::thread::sleep(std::time::Duration::from_millis(1000));
+                        std::thread::sleep(std::time::Duration::from_millis(reconnect_timeout));
                     }
 
 
