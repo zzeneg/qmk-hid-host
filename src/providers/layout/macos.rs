@@ -47,7 +47,9 @@ fn send_data(value: &String, layouts: &Vec<String>, data_sender: &broadcast::Sen
     tracing::info!("new layout: '{0}', layout list: {1:?}", value, layouts);
     if let Some(index) = layouts.into_iter().position(|r| r == value) {
         let data = vec![DataType::Layout as u8, index as u8];
-        data_sender.send(data).unwrap();
+        if let Err(e) =  data_sender.send(data) {
+            tracing::error!("failed to send layout data: {}", e);
+        }
     }
 }
 
