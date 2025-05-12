@@ -161,7 +161,7 @@ When you verified that the application works with your keyboard, you can use `qm
    Note: macOS, by default, may not locate your configuration file correctly. It's recommended to start `qmk-hid-host` with the configuration file path explicitly specified, for example:
         `./qmk-hid-host -c ~/Downloads/macos/qmk-hid-host.json`
    
-6. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
+5. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
    1. You're wrong with productId in your config
    2. Close Vial app and try again
 
