@@ -87,7 +87,7 @@ All files are available in [latest release](https://github.com/zzeneg/qmk-hid-ho
 Default configuration is set to [stront](https://github.com/zzeneg/stront). For other keyboards you need to modify the configuration file (`qmk-hid-host.json`).
 
 - `devices` section contains a list of keyboards
-  - `productId` - `pid` from your keyboard's `info.json`
+  - `productId` - `pid` from your keyboard's `info.json`. You can get it by running `qmk-hid-host -p`
   - `name` - keyboard's name (optional, visible only in logs)
   - `usage` and `usagePage` - optional, override only if `RAW_USAGE_ID` and `RAW_USAGE_PAGE` were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format (app sends layout's index, not name)
@@ -162,7 +162,7 @@ When you verified that the application works with your keyboard, you can use `qm
         `./qmk-hid-host -c ~/Downloads/macos/qmk-hid-host.json`
    
 5. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
-   1. You're wrong with productId in your config
+   1. You're wrong with productId in your config. Check `qmk-hid-host -p`
    2. Close Vial app and try again
 
 ## Development

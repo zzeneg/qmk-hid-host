@@ -7,10 +7,12 @@ mod config;
 mod data_type;
 mod keyboard;
 mod providers;
+mod utils;
 
 use config::load_config;
 use keyboard::Keyboard;
 use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+use utils::print_hids::print_unique_hid_devices;
 use tokio::sync::{broadcast, mpsc};
 
 #[cfg(not(target_os = "macos"))]
@@ -26,6 +28,9 @@ struct Args {
     /// Path to the configuration file
     #[arg(short, long)]
     config: Option<std::path::PathBuf>,
+    /// Print all connected HIDs
+    #[arg(short, long)]
+    print_hids: bool
 }
 
 fn main() {
@@ -40,6 +45,9 @@ fn main() {
     let (device_to_host_sender, _) = broadcast::channel::<Vec<u8>>(1);
 
     let args = Args::parse();
+    if args.print_hids {
+        return print_unique_hid_devices();
+    }
     let config = load_config(args.config.unwrap_or("./qmk-hid-host.json".into()));
     let reconnect_delay = config.reconnect_delay.unwrap_or(5000);
     for device in &config.devices {
