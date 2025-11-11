@@ -10,13 +10,14 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## Supported platforms/providers
 
-|              | Windows            | Linux                           | MacOS              |
-| ------------ | ------------------ | ------------------------------- | ------------------ |
-| Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
-| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: |
-| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
-| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |                    |
-| Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
+|              | Windows            | Linux                           | MacOS                        |
+| ------------ | ------------------ | ------------------------------- | ------------------           |
+| Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:           |
+| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark:           |
+| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark:           |
+| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      | :heavy_check_mark: (Spotify) |
+| Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:           |
+| Weather      |  |               | :heavy_check_mark:           |
 
 MacOS is partially supported, as I don't own any Apple devices, feel free to raise PRs.
 

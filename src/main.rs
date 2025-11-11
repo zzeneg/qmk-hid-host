@@ -11,7 +11,13 @@ mod utils;
 
 use config::load_config;
 use keyboard::Keyboard;
+
+#[cfg(not(target_os = "macos"))]
+use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+
+#[cfg(target_os = "macos")]
 use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider, weather::WeatherProvider};
+
 use utils::print_hids::print_unique_hid_devices;
 use tokio::sync::{broadcast, mpsc};
 
