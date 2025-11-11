@@ -11,11 +11,14 @@ mod utils;
 
 use config::load_config;
 use keyboard::Keyboard;
-use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider, weather::WeatherProvider};
 use utils::print_hids::print_unique_hid_devices;
 use tokio::sync::{broadcast, mpsc};
 
 #[cfg(not(target_os = "macos"))]
+use providers::media::MediaProvider;
+
+#[cfg(target_os = "macos")]
 use providers::media::MediaProvider;
 
 #[cfg(target_os = "macos")]
@@ -80,12 +83,19 @@ fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
 ) -> Vec<Box<dyn Provider>> {
-    return vec![
+    let mut providers: Vec<Box<dyn Provider>> = vec![
         TimeProvider::new(host_to_device_sender.clone()),
         VolumeProvider::new(host_to_device_sender.clone()),
         LayoutProvider::new(host_to_device_sender.clone()),
+        MediaProvider::new(host_to_device_sender.clone()),
         RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
     ];
+
+    if let Some(weather_config) = &config::get_config().weather {
+        providers.push(WeatherProvider::new(host_to_device_sender.clone(), weather_config.url.clone()));
+    }
+
+    return providers;
 }
 
 #[cfg(not(target_os = "macos"))]

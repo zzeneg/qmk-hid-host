@@ -1,5 +1,11 @@
 use std::{path::PathBuf, sync::OnceLock};
 
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WeatherConfig {
+    pub url: String,
+}
+
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
@@ -7,6 +13,8 @@ pub struct Config {
     pub layouts: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reconnect_delay: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weather: Option<WeatherConfig>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -42,6 +50,9 @@ pub fn load_config(path: PathBuf) -> &'static Config {
         }],
         layouts: vec!["en".to_string()],
         reconnect_delay: None,
+        weather: Some(WeatherConfig {
+            url: "wttr.in/Hamburg?format=%t".to_string(),
+        }),
     };
 
     if let Ok(file) = std::fs::read_to_string(&path) {
