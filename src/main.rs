@@ -27,7 +27,7 @@ use providers::media::MediaProvider;
 #[cfg(target_os = "macos")]
 use providers::media::MediaProvider;
 
-#[cfg(target_os = "macos")]
+// #[cfg(target_os = "macos")]
 use core_foundation_sys::runloop::CFRunLoopRun;
 
 use clap::Parser;
