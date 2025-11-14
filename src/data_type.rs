@@ -5,6 +5,7 @@ pub enum DataType {
     Layout,
     MediaArtist,
     MediaTitle,
+    Weather = 0xAF,
 
     RelayFromDevice = 0xCC,
     RelayToDevice,

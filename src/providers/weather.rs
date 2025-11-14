@@ -1,4 +1,4 @@
-#![cfg(target_os = "macos")]
+// #![cfg(target_os = "macos")]
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;

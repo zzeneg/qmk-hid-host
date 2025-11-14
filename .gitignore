@@ -19,3 +19,6 @@ target/
 **/.idea
 
 qmk-hid-host.json
+
+### mctechnology ###
+MY_README_qmk-hid-host.md

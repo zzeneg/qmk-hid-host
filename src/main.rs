@@ -12,10 +12,10 @@ mod utils;
 use config::load_config;
 use keyboard::Keyboard;
 
-#[cfg(not(target_os = "macos"))]
-use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
-
-#[cfg(target_os = "macos")]
+// #[cfg(not(target_os = "macos"))]
+// use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+//
+// #[cfg(target_os = "macos")]
 use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider, weather::WeatherProvider};
 
 use utils::print_hids::print_unique_hid_devices;
@@ -70,6 +70,7 @@ fn main() {
     run(host_to_device_sender, device_to_host_sender, is_connected_receiver);
 }
 
+/*
 #[cfg(not(target_os = "macos"))]
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
@@ -85,6 +86,7 @@ fn get_providers(
 }
 
 #[cfg(target_os = "macos")]
+*/
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
@@ -104,6 +106,7 @@ fn get_providers(
     return providers;
 }
 
+/*
 #[cfg(not(target_os = "macos"))]
 fn run(
     host_to_device_sender: broadcast::Sender<Vec<u8>>,
@@ -114,6 +117,7 @@ fn run(
 }
 
 #[cfg(target_os = "macos")]
+*/
 fn run(
     host_to_device_sender: broadcast::Sender<Vec<u8>>,
     device_to_host_sender: broadcast::Sender<Vec<u8>>,
