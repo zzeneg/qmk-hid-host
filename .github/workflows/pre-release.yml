@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths-ignore:
       - "**.md"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -108,10 +109,10 @@ jobs:
           path: dist
 
       - name: Create Release
-        uses: marvinpinto/action-automatic-releases@latest
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          tag_name: "latest"
           prerelease: true
-          title: "Latest Build"
+          name: "Latest Build"
           files: dist/**/*
