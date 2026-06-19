@@ -15,9 +15,9 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 | Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:           |
 | Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark:           |
 | Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark:           |
-| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      | :heavy_check_mark: (Spotify) |
+| Media info   | :heavy_check_mark: | :heavy_check_mark: (MPRIS/D-Bus)[^linux-spotify] | :heavy_check_mark: (Spotify) |
 | Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:           |
-| Weather      |  |               | :heavy_check_mark:           |
+| Weather      |  | :heavy_check_mark: | :heavy_check_mark: |
 
 MacOS is partially supported, as I don't own any Apple devices, feel free to raise PRs.
 
@@ -36,6 +36,8 @@ typedef enum {
     _LAYOUT,
     _MEDIA_ARTIST,
     _MEDIA_TITLE,
+    _WEATHER = 0xAF,
+    _MEDIA_PLAYER_LINUX = 0xB0,
 
     _RELAY_FROM_DEVICE = 0xCC,
     _RELAY_TO_DEVICE,
@@ -93,6 +95,7 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
   - `usage` and `usagePage` - optional, override only if `RAW_USAGE_ID` and `RAW_USAGE_PAGE` were redefined in firmware
 - `layouts` - list of supported keyboard layouts in two-letter format (app sends layout's index, not name)
 - `reconnectDelay` - delay between reconnecting attempts in milliseconds (optional, default is 5000)
+- `weather` - optional weather provider config for Linux and MacOS. The URL should return a temperature value, for example `wttr.in/Hamburg?format=%t`
 
 #### Minimal config
 
@@ -103,7 +106,10 @@ Default configuration is set to [stront](https://github.com/zzeneg/stront). For 
       "productId": "0x0844"
     }
   ],
-  "layouts": ["en"]
+  "layouts": ["en"],
+  "weather": {
+    "url": "wttr.in/Hamburg?format=%t"
+  }
 }
 ```
 
@@ -135,8 +141,20 @@ When you verified that the application works with your keyboard, you can use `qm
 
    [More info](https://get.vial.today/manual/linux-udev.html)
 
-2. Reconnect keyboard
-3. Start `qmk-hid-host`, add it to autorun if needed
+2. Install runtime dependencies for the enabled providers:
+
+   ```sh
+   sudo pacman -S curl
+   ```
+
+   Linux media info uses D-Bus/MPRIS, so the active player must expose MPRIS metadata. Spotify works out of the box. Other players, like mpv, depend on how they publish metadata.
+
+   The Linux media provider keeps sending the existing `MediaArtist` and `MediaTitle` packets, and also sends a compact media text packet using `_MEDIA_PLAYER_LINUX = 0xB0`.
+
+   Weather uses `curl` and the configured `weather.url`; the default expects a wttr.in response like `+29°C`.
+
+3. Reconnect keyboard
+4. Start `qmk-hid-host`, add it to autorun if needed
 
 ### MacOS
 > [!NOTE]
@@ -184,6 +202,7 @@ When you verified that the application works with your keyboard, you can use `qm
 
 ## Changelog
 
+- 2026-06-19 - add Linux weather and compact media player HID support
 - 2025-11-11 - add support for weather and spotify with MacOS
 - 2024-10-03 - add support for multiple devices, restructure config
 - 2024-09-15 - add MacOS support
@@ -191,3 +210,5 @@ When you verified that the application works with your keyboard, you can use `qm
 - 2024-01-21 - remove run as windows service, add silent version instead
 - 2024-01-02 - support RUST_LOG, run as windows service
 - 2023-07-30 - rewritten to Rust
+
+[^linux-spotify]: Tested with Spotify on Linux, where media metadata is reported correctly.
