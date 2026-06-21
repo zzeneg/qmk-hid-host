@@ -12,14 +12,16 @@ mod utils;
 use config::load_config;
 use keyboard::Keyboard;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
 
-#[cfg(target_os = "macos")]
-use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider, weather::WeatherProvider};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use providers::{
+    _base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider, weather::WeatherProvider,
+};
 
-use utils::print_hids::print_unique_hid_devices;
 use tokio::sync::{broadcast, mpsc};
+use utils::print_hids::print_unique_hid_devices;
 
 #[cfg(not(target_os = "macos"))]
 use providers::media::MediaProvider;
@@ -39,7 +41,7 @@ struct Args {
     config: Option<std::path::PathBuf>,
     /// Print all connected HIDs
     #[arg(short, long)]
-    print_hids: bool
+    print_hids: bool,
 }
 
 fn main() {
@@ -70,7 +72,7 @@ fn main() {
     run(host_to_device_sender, device_to_host_sender, is_connected_receiver);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
@@ -84,7 +86,7 @@ fn get_providers(
     ];
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
