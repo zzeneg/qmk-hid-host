@@ -3,10 +3,11 @@ pub enum DataType {
     Time = 0xAA, // random value that does not conflict with VIA/VIAL, must match firmware
     Volume,
     Layout,
-    MediaArtist,
-    MediaTitle,
+    MediaArtist = 0xAD,
+    MediaTitle = 0xAE,
     Weather = 0xAF,
     MediaPlayerLinux = 0xB0,
+    MediaExtended = 0xB1,
 
     RelayFromDevice = 0xCC,
     RelayToDevice,
