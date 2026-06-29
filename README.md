@@ -34,10 +34,11 @@ typedef enum {
     _TIME = 0xAA, // random value that does not conflict with VIA, must match companion app
     _VOLUME,
     _LAYOUT,
-    _MEDIA_ARTIST,
-    _MEDIA_TITLE,
+    _MEDIA_ARTIST = 0xAD,
+    _MEDIA_TITLE = 0xAE,
     _WEATHER = 0xAF,
     _MEDIA_PLAYER_LINUX = 0xB0,
+    _MEDIA_EXTENDED = 0xB1,
 
     _RELAY_FROM_DEVICE = 0xCC,
     _RELAY_TO_DEVICE,
@@ -149,7 +150,7 @@ When you verified that the application works with your keyboard, you can use `qm
 
    Linux media info uses D-Bus/MPRIS, so the active player must expose MPRIS metadata. Spotify works out of the box. Other players, like mpv, depend on how they publish metadata.
 
-   The Linux media provider keeps sending the existing `MediaArtist` and `MediaTitle` packets, and also sends a compact media text packet using `_MEDIA_PLAYER_LINUX = 0xB0`.
+   The Linux media provider sends `_MEDIA_ARTIST` (0xAD), `_MEDIA_TITLE` (0xAE), and `_MEDIA_PLAYER_LINUX` (0xB0, 8 bytes space-padded compact text) on title changes. When `"extended_media": true` is set in config, it also sends `_MEDIA_EXTENDED` (0xB1) on play/pause/track-change events, containing: 2-byte total time (seconds, u16 LE), 2-byte current position (seconds, u16 LE), 1-byte playback status (0=stopped, 1=playing, 2=paused), 1-byte artist name length, and the artist name (up to 21 bytes).
 
    Weather uses `curl` and the configured `weather.url`; the default expects a wttr.in response like `+29°C`.
 
@@ -202,7 +203,7 @@ When you verified that the application works with your keyboard, you can use `qm
 
 ## Changelog
 
-- 2026-06-19 - add Linux weather and compact media player HID support
+- 2026-06-19 - add Linux weather, compact media player, and extended media HID support
 - 2025-11-11 - add support for weather and spotify with MacOS
 - 2024-10-03 - add support for multiple devices, restructure config
 - 2024-09-15 - add MacOS support

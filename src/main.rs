@@ -91,11 +91,16 @@ fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
 ) -> Vec<Box<dyn Provider>> {
+    #[cfg(target_os = "linux")]
+    let media_provider = MediaProvider::new(host_to_device_sender.clone(), config::get_config().extended_media.unwrap_or(false));
+    #[cfg(target_os = "macos")]
+    let media_provider = MediaProvider::new(host_to_device_sender.clone());
+
     let mut providers: Vec<Box<dyn Provider>> = vec![
         TimeProvider::new(host_to_device_sender.clone()),
         VolumeProvider::new(host_to_device_sender.clone()),
         LayoutProvider::new(host_to_device_sender.clone()),
-        MediaProvider::new(host_to_device_sender.clone()),
+        media_provider,
         RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
     ];
 
